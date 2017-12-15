@@ -36,6 +36,10 @@ Array::Array(std::initializer_list<Value> init)
 	: m_Data(init)
 { }
 
+Array::Array(std::vector<Value>&& data)
+	: m_Data(std::move(data))
+{ }
+
 /**
  * Restrieves a value from an array.
  *
@@ -44,7 +48,7 @@ Array::Array(std::initializer_list<Value> init)
  */
 Value Array::Get(SizeType index) const
 {
-	ObjectLock olock(this);
+	RLock olock(this);
 
 	return m_Data.at(index);
 }
@@ -57,7 +61,7 @@ Value Array::Get(SizeType index) const
  */
 void Array::Set(SizeType index, const Value& value)
 {
-	ObjectLock olock(this);
+	WLock olock(this);
 
 	m_Data.at(index) = value;
 }
@@ -70,7 +74,7 @@ void Array::Set(SizeType index, const Value& value)
  */
 void Array::Set(SizeType index, Value&& value)
 {
-	ObjectLock olock(this);
+	WLock olock(this);
 
 	m_Data.at(index).Swap(value);
 }
@@ -82,7 +86,7 @@ void Array::Set(SizeType index, Value&& value)
  */
 void Array::Add(Value value)
 {
-	ObjectLock olock(this);
+	WLock olock(this);
 
 	m_Data.push_back(std::move(value));
 }
@@ -96,8 +100,6 @@ void Array::Add(Value value)
  */
 Array::Iterator Array::Begin()
 {
-	ASSERT(OwnsLock());
-
 	return m_Data.begin();
 }
 
@@ -110,8 +112,6 @@ Array::Iterator Array::Begin()
  */
 Array::Iterator Array::End()
 {
-	ASSERT(OwnsLock());
-
 	return m_Data.end();
 }
 
@@ -122,7 +122,7 @@ Array::Iterator Array::End()
  */
 size_t Array::GetLength() const
 {
-	ObjectLock olock(this);
+	RLock olock(this);
 
 	return m_Data.size();
 }
@@ -135,7 +135,7 @@ size_t Array::GetLength() const
  */
 bool Array::Contains(const Value& value) const
 {
-	ObjectLock olock(this);
+	RLock olock(this);
 
 	return (std::find(m_Data.begin(), m_Data.end(), value) != m_Data.end());
 }
@@ -148,7 +148,7 @@ bool Array::Contains(const Value& value) const
  */
 void Array::Insert(SizeType index, Value value)
 {
-	ObjectLock olock(this);
+	WLock olock(this);
 
 	ASSERT(index <= m_Data.size());
 
@@ -162,7 +162,7 @@ void Array::Insert(SizeType index, Value value)
  */
 void Array::Remove(SizeType index)
 {
-	ObjectLock olock(this);
+	WLock olock(this);
 
 	m_Data.erase(m_Data.begin() + index);
 }
@@ -174,36 +174,34 @@ void Array::Remove(SizeType index)
  */
 void Array::Remove(Array::Iterator it)
 {
-	ASSERT(OwnsLock());
-
 	m_Data.erase(it);
 }
 
 void Array::Resize(SizeType newSize)
 {
-	ObjectLock olock(this);
+	WLock olock(this);
 
 	m_Data.resize(newSize);
 }
 
 void Array::Clear()
 {
-	ObjectLock olock(this);
+	WLock olock(this);
 
 	m_Data.clear();
 }
 
 void Array::Reserve(SizeType newSize)
 {
-	ObjectLock olock(this);
+	WLock olock(this);
 
 	m_Data.reserve(newSize);
 }
 
 void Array::CopyTo(const Array::Ptr& dest) const
 {
-	ObjectLock olock(this);
-	ObjectLock xlock(dest);
+	RLock olock(this);
+	WLock xlock(dest);
 
 	std::copy(m_Data.begin(), m_Data.end(), std::back_inserter(dest->m_Data));
 }
@@ -230,7 +228,7 @@ Object::Ptr Array::Clone() const
 {
 	Array::Ptr arr = new Array();
 
-	ObjectLock olock(this);
+	RLock olock(this);
 	for (const Value& val : m_Data) {
 		arr->Add(val.Clone());
 	}
@@ -242,8 +240,7 @@ Array::Ptr Array::Reverse() const
 {
 	Array::Ptr result = new Array();
 
-	ObjectLock olock(this);
-	ObjectLock xlock(result);
+	RLock olock(this);
 
 	std::copy(m_Data.rbegin(), m_Data.rend(), std::back_inserter(result->m_Data));
 
@@ -252,7 +249,7 @@ Array::Ptr Array::Reverse() const
 
 void Array::Sort()
 {
-	ObjectLock olock(this);
+	WLock olock(this);
 	std::sort(m_Data.begin(), m_Data.end());
 }
 
@@ -273,7 +270,7 @@ Value Array::GetFieldByName(const String& field, bool sandboxed, const DebugInfo
 		return Object::GetFieldByName(field, sandboxed, debugInfo);
 	}
 
-	ObjectLock olock(this);
+	RLock olock(this);
 
 	if (index < 0 || static_cast<size_t>(index) >= GetLength())
 		BOOST_THROW_EXCEPTION(ScriptError("Array index '" + Convert::ToString(index) + "' is out of bounds.", debugInfo));
@@ -283,12 +280,12 @@ Value Array::GetFieldByName(const String& field, bool sandboxed, const DebugInfo
 
 void Array::SetFieldByName(const String& field, const Value& value, const DebugInfo& debugInfo)
 {
-	ObjectLock olock(this);
-
 	int index = Convert::ToLong(field);
 
 	if (index < 0)
 		BOOST_THROW_EXCEPTION(ScriptError("Array index '" + Convert::ToString(index) + "' is out of bounds.", debugInfo));
+
+	WLock olock(this);
 
 	if (static_cast<size_t>(index) >= GetLength())
 		Resize(index + 1);

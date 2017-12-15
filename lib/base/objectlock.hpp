@@ -25,28 +25,41 @@
 namespace icinga
 {
 
-/**
- * A scoped lock for Objects.
- */
-struct ObjectLock
+struct RLock
 {
 public:
-	ObjectLock(const Object::Ptr& object);
-	ObjectLock(const Object *object);
+	RLock(const Object::Ptr& object);
+	RLock(const Object *object);
+	RLock(rw_spin_lock& rwlock);
 
-	~ObjectLock();
+	~RLock(void);
 
-	static void LockMutex(const Object *object);
-
-	void Lock();
-
-	static void Spin(unsigned int it);
-
-	void Unlock();
+	void Lock(void);
+	void Unlock(void);
+	bool TryUpgrade(void);
+	void UnlockAndSleep(void);
 
 private:
-	const Object *m_Object{nullptr};
-	bool m_Locked{false};
+	rw_spin_lock &m_RWLock;
+	bool m_NeedReadUnlock;
+	bool m_NeedWriteUnlock;
+};
+
+struct WLock
+{
+public:
+	WLock(const Object::Ptr& object);
+	WLock(const Object *object);
+	WLock(rw_spin_lock& rwlock);
+
+	~WLock(void);
+
+	void Lock(void);
+	void Unlock(void);
+
+private:
+	rw_spin_lock& m_RWLock;
+	bool m_NeedUnlock;
 };
 
 }

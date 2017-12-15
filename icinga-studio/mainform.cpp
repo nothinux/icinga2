@@ -193,7 +193,7 @@ wxPGProperty *MainForm::ValueToProperty(const String& name, const Value& value)
 		Array::Ptr arr = value;
 
 		{
-			ObjectLock olock(arr);
+			RLock olock(arr);
 			for (const Value& aitem : arr) {
 				String val1 = aitem;
 				val.Add(val1.GetData());
@@ -209,7 +209,7 @@ wxPGProperty *MainForm::ValueToProperty(const String& name, const Value& value)
 		Dictionary::Ptr dict = value;
 
 		{
-			ObjectLock olock(dict);
+			RLock olock(dict);
 			for (const Dictionary::Pair& kv : dict) {
 				if (kv.first != "type")
 					prop->AppendChild(ValueToProperty(kv.first, kv.second));

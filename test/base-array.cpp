@@ -90,7 +90,7 @@ BOOST_AUTO_TEST_CASE(remove)
 	array->Add(5);
 
 	{
-		ObjectLock olock(array);
+		WLock olock(array);
 		auto it = array->Begin();
 		array->Remove(it);
 	}
@@ -109,7 +109,7 @@ BOOST_AUTO_TEST_CASE(foreach)
 	array->Add(2);
 	array->Add(5);
 
-	ObjectLock olock(array);
+	RLock olock(array);
 
 	int n = 0;
 

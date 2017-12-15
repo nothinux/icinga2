@@ -49,6 +49,9 @@ public:
 
 	typedef std::map<String, Value>::value_type Pair;
 
+	Dictionary(void) = default;
+	Dictionary(std::map<String, Value>&& data);
+
 	Value Get(const String& key) const;
 	bool Get(const String& key, Value *result) const;
 	void Set(const String& key, Value value);

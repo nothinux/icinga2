@@ -104,7 +104,7 @@ bool HostGroup::ResolveGroupMembership(const Host::Ptr& host, bool add, int rsta
 	Array::Ptr groups = GetGroups();
 
 	if (groups && groups->GetLength() > 0) {
-		ObjectLock olock(groups);
+		RLock olock(groups);
 
 		for (const String& name : groups) {
 			HostGroup::Ptr group = HostGroup::GetByName(name);

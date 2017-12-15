@@ -77,12 +77,7 @@ static Array::Ptr StringSplit(const String& delims)
 	String self = vframe->Self;
 	std::vector<String> tokens;
 	boost::algorithm::split(tokens, self, boost::is_any_of(delims));
-
-	Array::Ptr result = new Array();
-	for (const String& token : tokens) {
-		result->Add(token);
-	}
-	return result;
+	return new Array(std::vector<Value>(tokens.begin(), tokens.end()));
 }
 
 static int StringFind(const std::vector<Value>& args)

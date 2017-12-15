@@ -30,14 +30,14 @@ RingBuffer::RingBuffer(RingBuffer::SizeType slots)
 
 RingBuffer::SizeType RingBuffer::GetLength() const
 {
-	ObjectLock olock(this);
+	RLock olock(this);
 
 	return m_Slots.size();
 }
 
 void RingBuffer::InsertValue(RingBuffer::SizeType tv, int num)
 {
-	ObjectLock olock(this);
+	WLock olock(this);
 
 	RingBuffer::SizeType offsetTarget = tv % m_Slots.size();
 
@@ -66,11 +66,11 @@ void RingBuffer::InsertValue(RingBuffer::SizeType tv, int num)
 	m_Slots[offsetTarget] += num;
 }
 
-int RingBuffer::UpdateAndGetValues(RingBuffer::SizeType tv, RingBuffer::SizeType span)
+int RingBuffer::UpdateAndGetValues(RingBuffer::SizeType tv, RingBuffer::SizeType span, RingBuffer::SizeType *insertedValues)
 {
-	ObjectLock olock(this);
-
 	InsertValue(tv, 0);
+
+	RLock olock(this);
 
 	if (span > m_Slots.size())
 		span = m_Slots.size();
@@ -87,12 +87,15 @@ int RingBuffer::UpdateAndGetValues(RingBuffer::SizeType tv, RingBuffer::SizeType
 		span--;
 	}
 
+	if (insertedValues)
+		*insertedValues = m_InsertedValues;
+
 	return sum;
 }
 
 double RingBuffer::CalculateRate(RingBuffer::SizeType tv, RingBuffer::SizeType span)
 {
-	ObjectLock olock(this);
-	int sum = UpdateAndGetValues(tv, span);
-	return sum / static_cast<double>(std::min(span, m_InsertedValues));
+	SizeType insertedValues;
+	int sum = UpdateAndGetValues(tv, span, &insertedValues);
+	return sum / static_cast<double>(std::min(span, insertedValues));
 }

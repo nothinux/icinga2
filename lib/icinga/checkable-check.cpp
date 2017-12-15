@@ -102,7 +102,7 @@ double Checkable::GetLastCheck() const
 void Checkable::ProcessCheckResult(const CheckResult::Ptr& cr, const MessageOrigin::Ptr& origin)
 {
 	{
-		ObjectLock olock(this);
+		WLock olock(this);
 		m_CheckRunning = false;
 	}
 
@@ -149,7 +149,7 @@ void Checkable::ProcessCheckResult(const CheckResult::Ptr& cr, const MessageOrig
 	bool reachable = IsReachable();
 	bool notification_reachable = IsReachable(DependencyNotification);
 
-	ObjectLock olock(this);
+	WLock olock(this);
 
 	CheckResult::Ptr old_cr = GetLastCheckResult();
 	ServiceState old_state = GetStateRaw();
@@ -249,7 +249,7 @@ void Checkable::ProcessCheckResult(const CheckResult::Ptr& cr, const MessageOrig
 			if (parent.get() == this)
 				continue;
 
-			ObjectLock olock(parent);
+			WLock olock(parent);
 			parent->SetNextCheck(Utility::GetTime());
 		}
 	}
@@ -296,7 +296,7 @@ void Checkable::ProcessCheckResult(const CheckResult::Ptr& cr, const MessageOrig
 	if (is_volatile && IsStateOK(old_state) && IsStateOK(new_state))
 		send_notification = false; /* Don't send notifications for volatile OK -> OK changes. */
 
-	olock.Unlock();
+	//XXX: olock.Unlock();
 
 	if (remove_acknowledgement_comments)
 		RemoveCommentsByType(CommentAcknowledgement);
@@ -312,7 +312,7 @@ void Checkable::ProcessCheckResult(const CheckResult::Ptr& cr, const MessageOrig
 
 	cr->SetVarsAfter(vars_after);
 
-	olock.Lock();
+	//XXX: olock.Lock();
 	SetLastCheckResult(cr);
 
 	bool was_flapping = IsFlapping();
@@ -330,7 +330,7 @@ void Checkable::ProcessCheckResult(const CheckResult::Ptr& cr, const MessageOrig
 		SetNextCheck(Utility::GetTime() + GetCheckInterval(), false, origin);
 	}
 
-	olock.Unlock();
+	//XXX: olock.Unlock();
 
 #ifdef I2_DEBUG /* I2_DEBUG */
 	Log(LogDebug, "Checkable")
@@ -423,7 +423,7 @@ void Checkable::ExecuteCheck()
 	bool reachable = IsReachable();
 
 	{
-		ObjectLock olock(this);
+		WLock olock(this);
 
 		/* don't run another check if there is one pending */
 		if (m_CheckRunning)
@@ -500,7 +500,7 @@ void Checkable::ExecuteCheck()
 		}
 
 		{
-			ObjectLock olock(this);
+			WLock olock(this);
 			m_CheckRunning = false;
 		}
 	}

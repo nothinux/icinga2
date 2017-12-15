@@ -61,7 +61,7 @@ int CAListCommand::Run(const boost::program_options::variables_map& vm, const st
 	if (vm.count("json"))
 		std::cout << JsonEncode(requests);
 	else {
-		ObjectLock olock(requests);
+		RLock olock(requests);
 
 		std::cout << "Fingerprint                                                      | Timestamp                | Signed | Subject\n";
 		std::cout << "-----------------------------------------------------------------|--------------------------|--------|--------\n";

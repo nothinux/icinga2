@@ -40,7 +40,7 @@ StdioStream::~StdioStream()
 
 size_t StdioStream::Read(void *buffer, size_t size, bool allow_partial)
 {
-	ObjectLock olock(this);
+	WLock olock(this);
 
 	m_InnerStream->read(static_cast<char *>(buffer), size);
 	return m_InnerStream->gcount();
@@ -48,7 +48,7 @@ size_t StdioStream::Read(void *buffer, size_t size, bool allow_partial)
 
 void StdioStream::Write(const void *buffer, size_t size)
 {
-	ObjectLock olock(this);
+	WLock olock(this);
 
 	m_InnerStream->write(static_cast<const char *>(buffer), size);
 }

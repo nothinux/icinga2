@@ -121,7 +121,7 @@ bool Dependency::EvaluateApplyRule(const Checkable::Ptr& checkable, const ApplyR
 
 		Array::Ptr arr = vinstances;
 
-		ObjectLock olock(arr);
+		RLock olock(arr);
 		for (const Value& instance : arr) {
 			String name = rule.GetName();
 

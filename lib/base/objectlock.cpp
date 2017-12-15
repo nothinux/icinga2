@@ -18,119 +18,103 @@
  ******************************************************************************/
 
 #include "base/objectlock.hpp"
-#include <boost/thread/recursive_mutex.hpp>
 
 using namespace icinga;
 
-#define I2MUTEX_UNLOCKED 0
-#define I2MUTEX_LOCKED 1
+RLock::RLock(const Object::Ptr& object)
+    : m_RWLock(object->m_RWLock)
+{
+	Lock();
+}
 
-ObjectLock::~ObjectLock()
+RLock::RLock(const Object *object)
+    : m_RWLock(object->m_RWLock)
+{
+	Lock();
+}
+
+RLock::RLock(rw_spin_lock& rwlock)
+    : m_RWLock(rwlock)
+{
+	Lock();
+}
+
+RLock::~RLock(void)
+{
+	if (m_NeedReadUnlock || m_NeedWriteUnlock)
+		Unlock();
+}
+
+void RLock::Lock(void)
+{
+	m_RWLock.acquire_reader();
+	m_NeedReadUnlock = true;
+}
+
+void RLock::Unlock(void)
+{
+	ASSERT(m_NeedReadUnlock || m_NeedWriteUnlock);
+
+	if (m_NeedReadUnlock) {
+		m_RWLock.release_reader();
+		m_NeedReadUnlock = false;
+	} else if (m_NeedWriteUnlock) {
+		m_RWLock.release_writer();
+		m_NeedWriteUnlock = false;
+	}
+}
+
+bool RLock::TryUpgrade(void)
+{
+	ASSERT(m_NeedReadUnlock);
+
+	if (m_RWLock.try_upgrade_writer()) {
+		m_NeedReadUnlock = false;
+		m_NeedWriteUnlock = true;
+		return true;
+	}
+
+	return false;
+}
+
+void RLock::UnlockAndSleep(void)
 {
 	Unlock();
+	boost::thread::yield();
 }
 
-ObjectLock::ObjectLock(const Object::Ptr& object)
-	: m_Object(object.get()), m_Locked(false)
+WLock::WLock(const Object::Ptr& object)
+    : m_RWLock(object->m_RWLock)
 {
-	if (m_Object)
-		Lock();
+	Lock();
 }
 
-ObjectLock::ObjectLock(const Object *object)
-	: m_Object(object), m_Locked(false)
+WLock::WLock(const Object *object)
+    : m_RWLock(object->m_RWLock)
 {
-	if (m_Object)
-		Lock();
+	Lock();
 }
 
-void ObjectLock::LockMutex(const Object *object)
+WLock::WLock(rw_spin_lock& rwlock)
+    : m_RWLock(rwlock)
 {
-	unsigned int it = 0;
-
-#ifdef _WIN32
-#	ifdef _WIN64
-	while (likely(InterlockedCompareExchange64((LONGLONG *)&object->m_Mutex, I2MUTEX_LOCKED, I2MUTEX_UNLOCKED) != I2MUTEX_UNLOCKED)) {
-#	else /* _WIN64 */
-	while (likely(InterlockedCompareExchange(&object->m_Mutex, I2MUTEX_LOCKED, I2MUTEX_UNLOCKED) != I2MUTEX_UNLOCKED)) {
-#	endif /* _WIN64 */
-#else /* _WIN32 */
-	while (likely(!__sync_bool_compare_and_swap(&object->m_Mutex, I2MUTEX_UNLOCKED, I2MUTEX_LOCKED))) {
-#endif /* _WIN32 */
-		if (likely(object->m_Mutex > I2MUTEX_LOCKED)) {
-			auto *mtx = reinterpret_cast<boost::recursive_mutex *>(object->m_Mutex);
-			mtx->lock();
-
-			return;
-		}
-
-		Spin(it);
-		it++;
-	}
-
-	auto *mtx = new boost::recursive_mutex();
-	mtx->lock();
-#ifdef _WIN32
-#	ifdef _WIN64
-	InterlockedCompareExchange64((LONGLONG *)&object->m_Mutex, reinterpret_cast<LONGLONG>(mtx), I2MUTEX_LOCKED);
-#	else /* _WIN64 */
-	InterlockedCompareExchange(&object->m_Mutex, reinterpret_cast<LONG>(mtx), I2MUTEX_LOCKED);
-#	endif /* _WIN64 */
-#else /* _WIN32 */
-	__sync_bool_compare_and_swap(&object->m_Mutex, I2MUTEX_LOCKED, reinterpret_cast<uintptr_t>(mtx));
-#endif /* _WIN32 */
+	Lock();
 }
 
-void ObjectLock::Lock()
+WLock::~WLock(void)
 {
-	ASSERT(!m_Locked && m_Object);
-
-	LockMutex(m_Object);
-
-	m_Locked = true;
-
-#ifdef I2_DEBUG
-#	ifdef _WIN32
-	InterlockedExchange(&m_Object->m_LockOwner, GetCurrentThreadId());
-#	else /* _WIN32 */
-	__sync_lock_test_and_set(&m_Object->m_LockOwner, pthread_self());
-#	endif /* _WIN32 */
-#endif /* I2_DEBUG */
+	if (m_NeedUnlock)
+		Unlock();
 }
 
-void ObjectLock::Spin(unsigned int it)
+void WLock::Lock(void)
 {
-	if (it < 8) {
-		/* Do nothing. */
-	}
-#ifdef SPIN_PAUSE
-	else if (it < 16) {
-		SPIN_PAUSE();
-	}
-#endif /* SPIN_PAUSE */
-	else {
-#ifdef _WIN32
-		Sleep(0);
-#else /* _WIN32 */
-		sched_yield();
-#endif /* _WIN32 */
-	}
+	m_RWLock.acquire_writer();
+	m_NeedUnlock = true;
 }
 
-void ObjectLock::Unlock()
+void WLock::Unlock(void)
 {
-#ifdef I2_DEBUG
-	if (m_Locked) {
-#	ifdef _WIN32
-		InterlockedExchange(&m_Object->m_LockOwner, 0);
-#	else /* _WIN32 */
-		__sync_lock_release(&m_Object->m_LockOwner);
-#	endif /* _WIN32 */
-	}
-#endif /* I2_DEBUG */
-
-	if (m_Locked) {
-		reinterpret_cast<boost::recursive_mutex *>(m_Object->m_Mutex)->unlock();
-		m_Locked = false;
-	}
+	m_RWLock.release_writer();
+	m_NeedUnlock = false;
 }

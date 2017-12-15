@@ -25,37 +25,37 @@ using namespace icinga;
 
 void Checkable::AddDependency(const Dependency::Ptr& dep)
 {
-	boost::mutex::scoped_lock lock(m_DependencyMutex);
+	WLock lock(m_DependencyRWLock);
 	m_Dependencies.insert(dep);
 }
 
 void Checkable::RemoveDependency(const Dependency::Ptr& dep)
 {
-	boost::mutex::scoped_lock lock(m_DependencyMutex);
+	WLock lock(m_DependencyRWLock);
 	m_Dependencies.erase(dep);
 }
 
 std::vector<Dependency::Ptr> Checkable::GetDependencies() const
 {
-	boost::mutex::scoped_lock lock(m_DependencyMutex);
+	RLock lock(m_DependencyRWLock);
 	return std::vector<Dependency::Ptr>(m_Dependencies.begin(), m_Dependencies.end());
 }
 
 void Checkable::AddReverseDependency(const Dependency::Ptr& dep)
 {
-	boost::mutex::scoped_lock lock(m_DependencyMutex);
+	WLock lock(m_DependencyRWLock);
 	m_ReverseDependencies.insert(dep);
 }
 
 void Checkable::RemoveReverseDependency(const Dependency::Ptr& dep)
 {
-	boost::mutex::scoped_lock lock(m_DependencyMutex);
+	WLock lock(m_DependencyRWLock);
 	m_ReverseDependencies.erase(dep);
 }
 
 std::vector<Dependency::Ptr> Checkable::GetReverseDependencies() const
 {
-	boost::mutex::scoped_lock lock(m_DependencyMutex);
+	RLock lock(m_DependencyRWLock);
 	return std::vector<Dependency::Ptr>(m_ReverseDependencies.begin(), m_ReverseDependencies.end());
 }
 
@@ -68,9 +68,18 @@ bool Checkable::IsReachable(DependencyType dt, Dependency::Ptr *failedDependency
 		return false;
 	}
 
-	for (const Checkable::Ptr& checkable : GetParents()) {
-		if (!checkable->IsReachable(dt, failedDependency, rstack + 1))
-			return false;
+	{
+		RLock lock(m_DependencyRWLock);
+
+		for (const Dependency::Ptr& dep : m_Dependencies) {
+			Checkable::Ptr checkable = dep->GetParent();
+
+			if (!checkable || checkable == this)
+				continue;
+
+			if (!checkable->IsReachable(dt, failedDependency, rstack + 1))
+				return false;
+		}
 	}
 
 	/* implicit dependency on host if this is a service */
@@ -86,12 +95,16 @@ bool Checkable::IsReachable(DependencyType dt, Dependency::Ptr *failedDependency
 		}
 	}
 
-	for (const Dependency::Ptr& dep : GetDependencies()) {
-		if (!dep->IsAvailable(dt)) {
-			if (failedDependency)
-				*failedDependency = dep;
+	{
+		RLock lock(m_DependencyRWLock);
 
-			return false;
+		for (const Dependency::Ptr& dep : m_Dependencies) {
+			if (!dep->IsAvailable(dt)) {
+				if (failedDependency)
+					*failedDependency = dep;
+
+				return false;
+			}
 		}
 	}
 
@@ -105,11 +118,15 @@ std::set<Checkable::Ptr> Checkable::GetParents() const
 {
 	std::set<Checkable::Ptr> parents;
 
-	for (const Dependency::Ptr& dep : GetDependencies()) {
-		Checkable::Ptr parent = dep->GetParent();
+	{
+		RLock lock(m_DependencyRWLock);
 
-		if (parent && parent.get() != this)
-			parents.insert(parent);
+		for (const Dependency::Ptr& dep : m_Dependencies) {
+			Checkable::Ptr parent = dep->GetParent();
+
+			if (parent && parent.get() != this)
+				parents.insert(parent);
+		}
 	}
 
 	return parents;
@@ -119,11 +136,15 @@ std::set<Checkable::Ptr> Checkable::GetChildren() const
 {
 	std::set<Checkable::Ptr> parents;
 
-	for (const Dependency::Ptr& dep : GetReverseDependencies()) {
-		Checkable::Ptr service = dep->GetChild();
+	{
+		RLock lock(m_DependencyRWLock);
 
-		if (service && service.get() != this)
-			parents.insert(service);
+		for (const Dependency::Ptr& dep : m_ReverseDependencies) {
+			Checkable::Ptr service = dep->GetChild();
+
+			if (service && service.get() != this)
+				parents.insert(service);
+		}
 	}
 
 	return parents;

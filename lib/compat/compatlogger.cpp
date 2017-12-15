@@ -151,7 +151,7 @@ void CompatLogger::CheckResultHandler(const Checkable::Ptr& checkable, const Che
 	}
 
 	{
-		ObjectLock olock(this);
+		WLock olock(this);
 		WriteLine(msgbuf.str());
 		Flush();
 	}
@@ -187,7 +187,7 @@ void CompatLogger::TriggerDowntimeHandler(const Downtime::Ptr& downtime)
 	}
 
 	{
-		ObjectLock oLock(this);
+		WLock oLock(this);
 		WriteLine(msgbuf.str());
 		Flush();
 	}
@@ -234,7 +234,7 @@ void CompatLogger::RemoveDowntimeHandler(const Downtime::Ptr& downtime)
 	}
 
 	{
-		ObjectLock oLock(this);
+		WLock oLock(this);
 		WriteLine(msgbuf.str());
 		Flush();
 	}
@@ -298,7 +298,7 @@ void CompatLogger::NotificationSentHandler(const Notification::Ptr& notification
 	}
 
 	{
-		ObjectLock oLock(this);
+		WLock oLock(this);
 		WriteLine(msgbuf.str());
 		Flush();
 	}
@@ -342,7 +342,7 @@ void CompatLogger::FlappingChangedHandler(const Checkable::Ptr& checkable)
 	}
 
 	{
-		ObjectLock oLock(this);
+		WLock oLock(this);
 		WriteLine(msgbuf.str());
 		Flush();
 	}
@@ -378,7 +378,7 @@ void CompatLogger::EnableFlappingChangedHandler(const Checkable::Ptr& checkable)
 	}
 
 	{
-		ObjectLock oLock(this);
+		WLock oLock(this);
 		WriteLine(msgbuf.str());
 		Flush();
 	}
@@ -393,7 +393,7 @@ void CompatLogger::ExternalCommandHandler(const String& command, const std::vect
 		<< "";
 
 	{
-		ObjectLock oLock(this);
+		WLock oLock(this);
 		WriteLine(msgbuf.str());
 		Flush();
 	}
@@ -429,7 +429,7 @@ void CompatLogger::EventCommandHandler(const Checkable::Ptr& checkable)
 	}
 
 	{
-		ObjectLock oLock(this);
+		WLock oLock(this);
 		WriteLine(msgbuf.str());
 		Flush();
 	}
@@ -437,8 +437,6 @@ void CompatLogger::EventCommandHandler(const Checkable::Ptr& checkable)
 
 void CompatLogger::WriteLine(const String& line)
 {
-	ASSERT(OwnsLock());
-
 	if (!m_OutputFile.good())
 		return;
 
@@ -447,8 +445,6 @@ void CompatLogger::WriteLine(const String& line)
 
 void CompatLogger::Flush()
 {
-	ASSERT(OwnsLock());
-
 	if (!m_OutputFile.good())
 		return;
 
@@ -460,7 +456,7 @@ void CompatLogger::Flush()
  */
 void CompatLogger::ReopenFile(bool rotate)
 {
-	ObjectLock olock(this);
+	WLock olock(this);
 
 	String tempFile = GetLogDir() + "/icinga.log";
 

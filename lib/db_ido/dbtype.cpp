@@ -87,7 +87,7 @@ DbType::Ptr DbType::GetByID(long tid)
 
 DbObject::Ptr DbType::GetOrCreateObjectByName(const String& name1, const String& name2)
 {
-	ObjectLock olock(this);
+	WLock olock(this);
 
 	auto it = m_Objects.find(std::make_pair(name1, name2));
 

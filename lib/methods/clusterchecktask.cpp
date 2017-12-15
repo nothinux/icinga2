@@ -80,7 +80,7 @@ String ClusterCheckTask::FormatArray(const Array::Ptr& arr)
 	String str;
 
 	if (arr) {
-		ObjectLock olock(arr);
+		RLock olock(arr);
 		for (const Value& value : arr) {
 			if (first)
 				first = false;

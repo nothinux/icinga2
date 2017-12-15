@@ -82,7 +82,7 @@ void Service::OnAllConfigLoaded()
 	if (groups) {
 		groups = groups->ShallowClone();
 
-		ObjectLock olock(groups);
+		RLock olock(groups);
 
 		for (const String& name : groups) {
 			ServiceGroup::Ptr sg = ServiceGroup::GetByName(name);
@@ -129,7 +129,7 @@ int Service::GetSeverity() const
 {
 	int severity = 0;
 
-	ObjectLock olock(this);
+	RLock olock(this);
 	ServiceState state = GetStateRaw();
 
 	if (!HasBeenChecked())
@@ -148,8 +148,6 @@ int Service::GetSeverity() const
 		severity |= SeverityFlagAcknowledgement;
 	else
 		severity |= SeverityFlagUnhandled;
-
-	olock.Unlock();
 
 	return severity;
 }

@@ -57,8 +57,6 @@ void TimePeriod::Start(bool runtimeCreated)
 
 void TimePeriod::AddSegment(double begin, double end)
 {
-	ASSERT(OwnsLock());
-
 	Log(LogDebug, "TimePeriod")
 		<< "Adding segment '" << Utility::FormatDateTime("%c", begin) << "' <-> '"
 		<< Utility::FormatDateTime("%c", end) << "' to TimePeriod '" << GetName() << "'";
@@ -73,7 +71,7 @@ void TimePeriod::AddSegment(double begin, double end)
 
 	if (segments) {
 		/* Try to merge the new segment into an existing segment. */
-		ObjectLock dlock(segments);
+		RLock dlock(segments);
 		for (const Dictionary::Ptr& segment : segments) {
 			if (segment->Get("begin") <= begin && segment->Get("end") >= end)
 				return; /* New segment is fully contained in this segment. */
@@ -117,8 +115,6 @@ void TimePeriod::AddSegment(const Dictionary::Ptr& segment)
 
 void TimePeriod::RemoveSegment(double begin, double end)
 {
-	ASSERT(OwnsLock());
-
 	Log(LogDebug, "TimePeriod")
 		<< "Removing segment '" << Utility::FormatDateTime("%c", begin) << "' <-> '"
 		<< Utility::FormatDateTime("%c", end) << "' from TimePeriod '" << GetName() << "'";
@@ -137,7 +133,7 @@ void TimePeriod::RemoveSegment(double begin, double end)
 	Array::Ptr newSegments = new Array();
 
 	/* Try to split or adjust an existing segment. */
-	ObjectLock dlock(segments);
+	RLock dlock(segments);
 	for (const Dictionary::Ptr& segment : segments) {
 		/* Fully contained in the specified range? */
 		if (segment->Get("begin") >= begin && segment->Get("end") <= end)
@@ -189,8 +185,6 @@ void TimePeriod::RemoveSegment(const Dictionary::Ptr& segment)
 
 void TimePeriod::PurgeSegments(double end)
 {
-	ASSERT(OwnsLock());
-
 	Log(LogDebug, "TimePeriod")
 		<< "Purging segments older than '" << Utility::FormatDateTime("%c", end)
 		<< "' from TimePeriod '" << GetName() << "'";
@@ -208,7 +202,7 @@ void TimePeriod::PurgeSegments(double end)
 	Array::Ptr newSegments = new Array();
 
 	/* Remove old segments. */
-	ObjectLock dlock(segments);
+	RLock dlock(segments);
 	for (const Dictionary::Ptr& segment : segments) {
 		if (segment->Get("end") >= end)
 			newSegments->Add(segment);
@@ -226,8 +220,8 @@ void TimePeriod::Merge(const TimePeriod::Ptr& timeperiod, bool include)
 	Array::Ptr segments = timeperiod->GetSegments();
 
 	if (segments) {
-		ObjectLock dlock(segments);
-		ObjectLock ilock(this);
+		RLock dlock(segments);
+		WLock ilock(this);
 		for (const Dictionary::Ptr& segment : segments) {
 			include ? AddSegment(segment) : RemoveSegment(segment);
 		}
@@ -247,11 +241,11 @@ void TimePeriod::UpdateRegion(double begin, double end, bool clearExisting)
 	Array::Ptr segments = GetUpdate()->Invoke({ this, begin, end });
 
 	{
-		ObjectLock olock(this);
+		WLock olock(this);
 		RemoveSegment(begin, end);
 
 		if (segments) {
-			ObjectLock dlock(segments);
+			RLock dlock(segments);
 			for (const Dictionary::Ptr& segment : segments) {
 				AddSegment(segment);
 			}
@@ -264,7 +258,7 @@ void TimePeriod::UpdateRegion(double begin, double end, bool clearExisting)
 	Array::Ptr timeranges = preferInclude ? GetExcludes() : GetIncludes();
 
 	if (timeranges) {
-		ObjectLock olock(timeranges);
+		RLock olock(timeranges);
 		for (const String& name : timeranges) {
 			const TimePeriod::Ptr timeperiod = TimePeriod::GetByName(name);
 
@@ -277,7 +271,7 @@ void TimePeriod::UpdateRegion(double begin, double end, bool clearExisting)
 	timeranges = preferInclude ? GetIncludes() : GetExcludes();
 
 	if (timeranges) {
-		ObjectLock olock(timeranges);
+		RLock olock(timeranges);
 		for (const String& name : timeranges) {
 			const TimePeriod::Ptr timeperiod = TimePeriod::GetByName(name);
 
@@ -294,7 +288,7 @@ bool TimePeriod::GetIsInside() const
 
 bool TimePeriod::IsInside(double ts) const
 {
-	ObjectLock olock(this);
+	RLock olock(this);
 
 	if (GetValidBegin().IsEmpty() || ts < GetValidBegin() || GetValidEnd().IsEmpty() || ts > GetValidEnd())
 		return true; /* Assume that all invalid regions are "inside". */
@@ -302,7 +296,7 @@ bool TimePeriod::IsInside(double ts) const
 	Array::Ptr segments = GetSegments();
 
 	if (segments) {
-		ObjectLock dlock(segments);
+		RLock dlock(segments);
 		for (const Dictionary::Ptr& segment : segments) {
 			if (ts > segment->Get("begin") && ts < segment->Get("end"))
 				return true;
@@ -314,14 +308,14 @@ bool TimePeriod::IsInside(double ts) const
 
 double TimePeriod::FindNextTransition(double begin)
 {
-	ObjectLock olock(this);
+	RLock olock(this);
 
 	Array::Ptr segments = GetSegments();
 
 	double closestTransition = -1;
 
 	if (segments) {
-		ObjectLock dlock(segments);
+		RLock dlock(segments);
 		for (const Dictionary::Ptr& segment : segments) {
 			if (segment->Get("begin") > begin && (segment->Get("begin") < closestTransition || closestTransition == -1))
 				closestTransition = segment->Get("begin");
@@ -345,7 +339,7 @@ void TimePeriod::UpdateTimerHandler()
 		double valid_end;
 
 		{
-			ObjectLock olock(tp);
+			WLock olock(tp);
 			tp->PurgeSegments(now - 3600);
 
 			valid_end = tp->GetValidEnd();
@@ -370,7 +364,7 @@ void TimePeriod::Dump()
 		<< "' until '" << Utility::FormatDateTime("%c", GetValidEnd());
 
 	if (segments) {
-		ObjectLock dlock(segments);
+		RLock dlock(segments);
 		for (const Dictionary::Ptr& segment : segments) {
 			Log(LogDebug, "TimePeriod")
 				<< "Segment: " << Utility::FormatDateTime("%c", segment->Get("begin")) << " <-> "
@@ -391,7 +385,7 @@ void TimePeriod::ValidateRanges(const Dictionary::Ptr& value, const ValidationUt
 	tm reference = Utility::LocalTime(refts);
 	Array::Ptr segments = new Array();
 
-	ObjectLock olock(value);
+	RLock olock(value);
 	for (const Dictionary::Pair& kv : value) {
 		try {
 			tm begin_tm, end_tm;

@@ -182,7 +182,7 @@ void HttpServerConnection::ProcessMessageAsync(HttpRequest& request)
 		String origin = request.Headers->Get("origin");
 
 		{
-			ObjectLock olock(headerAllowOrigin);
+			RLock olock(headerAllowOrigin);
 
 			for (const String& allowedOrigin : headerAllowOrigin) {
 				if (allowedOrigin == origin)

@@ -43,7 +43,7 @@ public:
 
 	SizeType GetLength() const;
 	void InsertValue(SizeType tv, int num);
-	int UpdateAndGetValues(SizeType tv, SizeType span);
+	int UpdateAndGetValues(SizeType tv, SizeType span, SizeType *insertedValues = nullptr);
 	double CalculateRate(SizeType tv, SizeType span);
 
 private:

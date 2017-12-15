@@ -50,7 +50,8 @@ void ConfigObjectTargetProvider::FindTargets(const String& type, const std::func
 	auto *ctype = dynamic_cast<ConfigType *>(ptype.get());
 
 	if (ctype) {
-		for (const ConfigObject::Ptr& object : ctype->GetObjects()) {
+		RLock lock(ctype->GetObjectsRWLock());
+		for (const ConfigObject::Ptr& object : ctype->GetObjectsUnlocked()) {
 			addTarget(object);
 		}
 	}
@@ -143,7 +144,7 @@ void FilterUtility::CheckPermission(const ApiUser::Ptr& user, const String& perm
 
 	Array::Ptr permissions = user->GetPermissions();
 	if (permissions) {
-		ObjectLock olock(permissions);
+		RLock olock(permissions);
 		for (const Value& item : permissions) {
 			String permission;
 			Function::Ptr filter;
@@ -222,7 +223,7 @@ std::vector<Value> FilterUtility::GetFilterTargets(const QueryDescription& qd, c
 		if (query->Contains(attr)) {
 			Array::Ptr names = query->Get(attr);
 			if (names) {
-				ObjectLock olock(names);
+				RLock olock(names);
 				for (const String& name : names) {
 					Object::Ptr target = provider->GetTargetByName(type, name);
 
@@ -260,7 +261,7 @@ std::vector<Value> FilterUtility::GetFilterTargets(const QueryDescription& qd, c
 
 		Dictionary::Ptr filter_vars = query->Get("filter_vars");
 		if (filter_vars) {
-			ObjectLock olock(filter_vars);
+			RLock olock(filter_vars);
 			for (const Dictionary::Pair& kv : filter_vars) {
 				uvars->Set(kv.first, kv.second);
 			}

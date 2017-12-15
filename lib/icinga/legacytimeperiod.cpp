@@ -426,7 +426,7 @@ Dictionary::Ptr LegacyTimePeriod::FindNextSegment(const String& daydef, const St
 				Dictionary::Ptr bestSegment;
 				double bestBegin;
 
-				ObjectLock olock(segments);
+				RLock olock(segments);
 				for (const Dictionary::Ptr& segment : segments) {
 					double begin = segment->Get("begin");
 
@@ -470,7 +470,7 @@ Array::Ptr LegacyTimePeriod::ScriptFunc(const TimePeriod::Ptr& tp, double begin,
 				<< "Checking reference time " << refts;
 #endif /* I2_DEBUG */
 
-			ObjectLock olock(ranges);
+			RLock olock(ranges);
 			for (const Dictionary::Pair& kv : ranges) {
 				if (!IsInDayDefinition(kv.first, &reference)) {
 #ifdef I2_DEBUG

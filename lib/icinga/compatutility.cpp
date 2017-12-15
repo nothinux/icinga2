@@ -41,7 +41,7 @@ String CompatUtility::GetCommandLine(const Command::Ptr& command)
 	if (commandLine.IsObjectType<Array>()) {
 		Array::Ptr args = commandLine;
 
-		ObjectLock olock(args);
+		RLock olock(args);
 		for (const String& arg : args) {
 			// This is obviously incorrect for non-trivial cases.
 			result += " \"" + EscapeString(arg) + "\"";
@@ -141,7 +141,7 @@ String CompatUtility::GetCheckableCommandArgs(const Checkable::Ptr& checkable)
 		Dictionary::Ptr command_vars = command->GetVars();
 
 		if (command_vars) {
-			ObjectLock olock(command_vars);
+			RLock olock(command_vars);
 			for (const Dictionary::Pair& kv : command_vars) {
 				String macro = "$" + kv.first + "$"; // this is too simple
 				if (command_line.Contains(macro))
@@ -153,7 +153,7 @@ String CompatUtility::GetCheckableCommandArgs(const Checkable::Ptr& checkable)
 		Dictionary::Ptr host_vars = host->GetVars();
 
 		if (host_vars) {
-			ObjectLock olock(host_vars);
+			RLock olock(host_vars);
 			for (const Dictionary::Pair& kv : host_vars) {
 				String macro = "$" + kv.first + "$"; // this is too simple
 				if (command_line.Contains(macro))
@@ -168,7 +168,7 @@ String CompatUtility::GetCheckableCommandArgs(const Checkable::Ptr& checkable)
 			Dictionary::Ptr service_vars = service->GetVars();
 
 			if (service_vars) {
-				ObjectLock olock(service_vars);
+				RLock olock(service_vars);
 				for (const Dictionary::Pair& kv : service_vars) {
 					String macro = "$" + kv.first + "$"; // this is too simple
 					if (command_line.Contains(macro))
@@ -181,7 +181,7 @@ String CompatUtility::GetCheckableCommandArgs(const Checkable::Ptr& checkable)
 		}
 
 		String arg_string;
-		ObjectLock olock(args);
+		RLock olock(args);
 		for (const Dictionary::Pair& kv : args) {
 			arg_string += Convert::ToString(kv.first) + "=" + Convert::ToString(kv.second) + "!";
 		}
@@ -493,7 +493,7 @@ int CompatUtility::GetCheckableNotificationTypeFilter(const Checkable::Ptr& chec
 	unsigned long notification_type_filter = 0;
 
 	for (const Notification::Ptr& notification : checkable->GetNotifications()) {
-		ObjectLock olock(notification);
+		RLock olock(notification);
 
 		notification_type_filter |= notification->GetTypeFilter();
 	}
@@ -506,7 +506,7 @@ int CompatUtility::GetCheckableNotificationStateFilter(const Checkable::Ptr& che
 	unsigned long notification_state_filter = 0;
 
 	for (const Notification::Ptr& notification : checkable->GetNotifications()) {
-		ObjectLock olock(notification);
+		RLock olock(notification);
 
 		notification_state_filter |= notification->GetStateFilter();
 	}
@@ -576,7 +576,7 @@ std::set<User::Ptr> CompatUtility::GetCheckableNotificationUsers(const Checkable
 	std::set<User::Ptr> users;
 
 	for (const Notification::Ptr& notification : checkable->GetNotifications()) {
-		ObjectLock olock(notification);
+		RLock olock(notification);
 
 		users = notification->GetUsers();
 
@@ -596,7 +596,7 @@ std::set<UserGroup::Ptr> CompatUtility::GetCheckableNotificationUserGroups(const
 	std::set<UserGroup::Ptr> usergroups;
 	/* Service -> Notifications -> UserGroups */
 	for (const Notification::Ptr& notification : checkable->GetNotifications()) {
-		ObjectLock olock(notification);
+		RLock olock(notification);
 
 		for (const UserGroup::Ptr& ug : notification->GetUserGroups()) {
 			usergroups.insert(ug);

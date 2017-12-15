@@ -113,7 +113,7 @@ bool ApiListener::UpdateConfigDir(const ConfigDirInformation& oldConfigInfo, con
 	size_t numBytes = 0;
 
 	{
-		ObjectLock olock(newConfig);
+		RLock olock(newConfig);
 		for (const Dictionary::Pair& kv : newConfig) {
 			if (oldConfig->Get(kv.first) != kv.second) {
 				if (!Utility::Match("*/.timestamp", kv.first))
@@ -145,7 +145,7 @@ bool ApiListener::UpdateConfigDir(const ConfigDirInformation& oldConfigInfo, con
 		<< Utility::FormatDateTime("%Y-%m-%d %H:%M:%S %z", oldTimestamp) << "' ("
 		<< oldTimestamp << ").";
 
-	ObjectLock xlock(oldConfig);
+	RLock xlock(oldConfig);
 	for (const Dictionary::Pair& kv : oldConfig) {
 		if (!newConfig->Contains(kv.first)) {
 			configChange = true;
@@ -183,14 +183,14 @@ void ApiListener::SyncZoneDir(const Zone::Ptr& zone) const
 		ConfigDirInformation newConfigPart = LoadConfigDir(zf.Path);
 
 		{
-			ObjectLock olock(newConfigPart.UpdateV1);
+			RLock olock(newConfigPart.UpdateV1);
 			for (const Dictionary::Pair& kv : newConfigPart.UpdateV1) {
 				newConfigInfo.UpdateV1->Set("/" + zf.Tag + kv.first, kv.second);
 			}
 		}
 
 		{
-			ObjectLock olock(newConfigPart.UpdateV2);
+			RLock olock(newConfigPart.UpdateV2);
 			for (const Dictionary::Pair& kv : newConfigPart.UpdateV2) {
 				newConfigInfo.UpdateV2->Set("/" + zf.Tag + kv.first, kv.second);
 			}
@@ -299,7 +299,7 @@ Value ApiListener::ConfigUpdateHandler(const MessageOrigin::Ptr& origin, const D
 
 	bool configChange = false;
 
-	ObjectLock olock(updateV1);
+	RLock olock(updateV1);
 	for (const Dictionary::Pair& kv : updateV1) {
 		Zone::Ptr zone = Zone::GetByName(kv.first);
 

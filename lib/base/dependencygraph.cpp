@@ -18,21 +18,22 @@
  ******************************************************************************/
 
 #include "base/dependencygraph.hpp"
+#include "base/objectlock.hpp"
 
 using namespace icinga;
 
-boost::mutex DependencyGraph::m_Mutex;
+rw_spin_lock DependencyGraph::m_RWLock;
 std::map<Object *, std::map<Object *, int> > DependencyGraph::m_Dependencies;
 
 void DependencyGraph::AddDependency(Object *parent, Object *child)
 {
-	boost::mutex::scoped_lock lock(m_Mutex);
+	WLock lock(m_RWLock);
 	m_Dependencies[child][parent]++;
 }
 
 void DependencyGraph::RemoveDependency(Object *parent, Object *child)
 {
-	boost::mutex::scoped_lock lock(m_Mutex);
+	WLock lock(m_RWLock);
 
 	auto& refs = m_Dependencies[child];
 	auto it = refs.find(parent);
@@ -53,7 +54,7 @@ std::vector<Object::Ptr> DependencyGraph::GetParents(const Object::Ptr& child)
 {
 	std::vector<Object::Ptr> objects;
 
-	boost::mutex::scoped_lock lock(m_Mutex);
+	RLock lock(m_RWLock);
 	auto it = m_Dependencies.find(child.get());
 
 	if (it != m_Dependencies.end()) {

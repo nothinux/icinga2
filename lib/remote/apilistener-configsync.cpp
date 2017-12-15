@@ -123,10 +123,10 @@ Value ApiListener::ConfigUpdateObjectAPIHandler(const MessageOrigin::Ptr& origin
 			Log(LogCritical, "ApiListener")
 				<< "Could not create object '" << objName << "':";
 
-				ObjectLock olock(errors);
+			RLock olock(errors);
 			for (const String& error : errors) {
-					Log(LogCritical, "ApiListener", error);
-				}
+				Log(LogCritical, "ApiListener", error);
+			}
 
 			return Empty;
 		}
@@ -161,7 +161,7 @@ Value ApiListener::ConfigUpdateObjectAPIHandler(const MessageOrigin::Ptr& origin
 	Dictionary::Ptr modified_attributes = params->Get("modified_attributes");
 
 	if (modified_attributes) {
-		ObjectLock olock(modified_attributes);
+		RLock olock(modified_attributes);
 		for (const Dictionary::Pair& kv : modified_attributes) {
 			/* update all modified attributes
 			 * but do not update the object version yet.
@@ -179,7 +179,7 @@ Value ApiListener::ConfigUpdateObjectAPIHandler(const MessageOrigin::Ptr& origin
 		std::vector<String> restoreAttrs;
 
 		{
-			ObjectLock xlock(objOriginalAttributes);
+			RLock xlock(objOriginalAttributes);
 			for (const Dictionary::Pair& kv : objOriginalAttributes) {
 				/* original attribute was removed, restore it */
 				if (!newOriginalAttributes->Contains(kv.first))
@@ -261,7 +261,7 @@ Value ApiListener::ConfigDeleteObjectAPIHandler(const MessageOrigin::Ptr& origin
 	if (!ConfigObjectUtility::DeleteObject(object, true, errors)) {
 		Log(LogCritical, "ApiListener", "Could not delete object:");
 
-		ObjectLock olock(errors);
+		RLock olock(errors);
 		for (const String& error : errors) {
 			Log(LogCritical, "ApiListener", error);
 		}
@@ -314,7 +314,7 @@ void ApiListener::UpdateConfigObject(const ConfigObject::Ptr& object, const Mess
 	Array::Ptr newOriginalAttributes = new Array();
 
 	if (original_attributes) {
-		ObjectLock olock(original_attributes);
+		RLock olock(original_attributes);
 		for (const Dictionary::Pair& kv : original_attributes) {
 			std::vector<String> tokens;
 			boost::algorithm::split(tokens, kv.first, boost::is_any_of("."));
@@ -419,7 +419,8 @@ void ApiListener::SendRuntimeConfigObjects(const JsonRpcConnection::Ptr& aclient
 		if (!dtype)
 			continue;
 
-		for (const ConfigObject::Ptr& object : dtype->GetObjects()) {
+		RLock lock(dtype->GetObjectsRWLock());
+		for (const ConfigObject::Ptr& object : dtype->GetObjectsUnlocked()) {
 			/* don't sync objects for non-matching parent-child zones */
 			if (!azone->CanAccessObject(object))
 				continue;

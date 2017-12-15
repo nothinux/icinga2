@@ -138,7 +138,7 @@ std::pair<double, double> ScheduledDowntime::FindNextSegment()
 	double bestBegin;
 	double now = Utility::GetTime();
 
-	ObjectLock olock(ranges);
+	RLock olock(ranges);
 	for (const Dictionary::Pair& kv : ranges) {
 		Log(LogDebug, "ScheduledDowntime")
 			<< "Evaluating segment: " << kv.first << ": " << kv.second << " at ";
@@ -208,7 +208,7 @@ void ScheduledDowntime::ValidateRanges(const Dictionary::Ptr& value, const Valid
 	tm reference = Utility::LocalTime(refts);
 	Array::Ptr segments = new Array();
 
-	ObjectLock olock(value);
+	RLock olock(value);
 	for (const Dictionary::Pair& kv : value) {
 		try {
 			tm begin_tm, end_tm;

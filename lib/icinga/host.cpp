@@ -53,7 +53,7 @@ void Host::OnAllConfigLoaded()
 	if (groups) {
 		groups = groups->ShallowClone();
 
-		ObjectLock olock(groups);
+		RLock olock(groups);
 
 		for (const String& name : groups) {
 			HostGroup::Ptr hg = HostGroup::GetByName(name);
@@ -86,7 +86,7 @@ void Host::Stop(bool runtimeRemoved)
 	Array::Ptr groups = GetGroups();
 
 	if (groups) {
-		ObjectLock olock(groups);
+		RLock olock(groups);
 
 		for (const String& name : groups) {
 			HostGroup::Ptr hg = HostGroup::GetByName(name);
@@ -186,7 +186,7 @@ int Host::GetSeverity() const
 {
 	int severity = 0;
 
-	ObjectLock olock(this);
+	RLock olock(this);
 	ServiceState state = GetStateRaw();
 
 	/* OK/Warning = Up, Critical/Unknownb = Down */
@@ -203,8 +203,6 @@ int Host::GetSeverity() const
 		severity |= SeverityFlagAcknowledgement;
 	else
 		severity |= SeverityFlagUnhandled;
-
-	olock.Unlock();
 
 	return severity;
 }

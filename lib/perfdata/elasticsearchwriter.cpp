@@ -133,7 +133,7 @@ void ElasticsearchWriter::AddCheckResult(const Dictionary::Ptr& fields, const Ch
 	Array::Ptr perfdata = cr->GetPerformanceData();
 
 	if (perfdata) {
-		ObjectLock olock(perfdata);
+		RLock olock(perfdata);
 		for (const Value& val : perfdata) {
 			PerfdataValue::Ptr pdv;
 

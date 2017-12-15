@@ -63,6 +63,7 @@ set(base_SOURCES
   process.cpp process.hpp
   registry.hpp
   ringbuffer.cpp ringbuffer.hpp
+  rw_spin_lock.cpp rw_spin_lock.hpp
   scriptframe.cpp scriptframe.hpp
   scriptglobal.cpp scriptglobal.hpp
   scriptutils.cpp scriptutils.hpp

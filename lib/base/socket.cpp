@@ -64,7 +64,7 @@ void Socket::SetFD(SOCKET fd)
 #endif /* _WIN32 */
 	}
 
-	ObjectLock olock(this);
+	WLock olock(this);
 	m_FD = fd;
 }
 
@@ -75,7 +75,7 @@ void Socket::SetFD(SOCKET fd)
  */
 SOCKET Socket::GetFD() const
 {
-	ObjectLock olock(this);
+	RLock olock(this);
 
 	return m_FD;
 }
@@ -85,7 +85,7 @@ SOCKET Socket::GetFD() const
  */
 void Socket::Close()
 {
-	ObjectLock olock(this);
+	WLock olock(this);
 
 	if (m_FD != INVALID_SOCKET) {
 		closesocket(m_FD);

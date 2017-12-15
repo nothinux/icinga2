@@ -240,7 +240,7 @@ void GraphiteWriter::SendPerfdata(const String& prefix, const CheckResult::Ptr& 
 	if (!perfdata)
 		return;
 
-	ObjectLock olock(perfdata);
+	RLock olock(perfdata);
 	for (const Value& val : perfdata) {
 		PerfdataValue::Ptr pdv;
 
@@ -285,7 +285,7 @@ void GraphiteWriter::SendMetric(const String& prefix, const String& name, double
 	msgbuf << "\n";
 	String metric = msgbuf.str();
 
-	ObjectLock olock(this);
+	WLock olock(this);
 
 	if (!GetConnected())
 		return;
@@ -332,9 +332,11 @@ Value GraphiteWriter::EscapeMacroMetric(const Value& value)
 		Array::Ptr arr = value;
 		Array::Ptr result = new Array();
 
-		ObjectLock olock(arr);
-		for (const Value& arg : arr) {
-			result->Add(EscapeMetric(arg));
+		{
+			RLock olock(arr);
+			for (const Value& arg : arr) {
+				result->Add(EscapeMetric(arg));
+			}
 		}
 
 		return Utility::Join(result, '.');

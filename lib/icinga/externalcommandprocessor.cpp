@@ -659,7 +659,7 @@ void ExternalCommandProcessor::RemoveSvcAcknowledgement(double, const std::vecto
 		<< "Removing acknowledgement for service '" << service->GetName() << "'";
 
 	{
-		ObjectLock olock(service);
+		WLock olock(service);
 		service->ClearAcknowledgement();
 	}
 
@@ -723,7 +723,7 @@ void ExternalCommandProcessor::RemoveHostAcknowledgement(double, const std::vect
 		<< "Removing acknowledgement for host '" << host->GetName() << "'";
 
 	{
-		ObjectLock olock(host);
+		WLock olock(host);
 		host->ClearAcknowledgement();
 	}
 	host->RemoveCommentsByType(CommentAcknowledgement);

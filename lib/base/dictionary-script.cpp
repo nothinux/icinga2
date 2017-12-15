@@ -71,24 +71,34 @@ static Array::Ptr DictionaryKeys()
 {
 	ScriptFrame *vframe = ScriptFrame::GetCurrentFrame();
 	Dictionary::Ptr self = static_cast<Dictionary::Ptr>(vframe->Self);
-	Array::Ptr keys = new Array();
-	ObjectLock olock(self);
-	for (const Dictionary::Pair& kv : self) {
-		keys->Add(kv.first);
+	std::vector<Value> keys;
+
+	{
+		RLock olock(self);
+		keys.reserve(self->GetLength());
+		for (const Dictionary::Pair& kv : self) {
+			keys.push_back(kv.first);
+		}
 	}
-	return keys;
+
+	return new Array(std::move(keys));
 }
 
 static Array::Ptr DictionaryValues()
 {
 	ScriptFrame *vframe = ScriptFrame::GetCurrentFrame();
 	Dictionary::Ptr self = static_cast<Dictionary::Ptr>(vframe->Self);
-	Array::Ptr keys = new Array();
-	ObjectLock olock(self);
-	for (const Dictionary::Pair& kv : self) {
-		keys->Add(kv.second);
+	std::vector<Value> values;
+
+	{
+		RLock olock(self);
+		values.reserve(self->GetLength());
+		for (const Dictionary::Pair& kv : self) {
+			values.push_back(kv.second);
+		}
 	}
-	return keys;
+
+	return new Array(std::move(values));
 }
 
 Object::Ptr Dictionary::GetPrototype()

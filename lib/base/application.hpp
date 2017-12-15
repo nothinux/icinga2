@@ -186,6 +186,7 @@ private:
 
 	static int m_ArgC; /**< The number of command-line arguments. */
 	static char **m_ArgV; /**< Command-line arguments. */
+	boost::mutex m_PidMutex;
 	FILE *m_PidFile; /**< The PID file */
 	static bool m_Debugging; /**< Whether debugging is enabled. */
 	static LogSeverity m_DebuggingSeverity; /**< Whether debugging severity is set. */

@@ -120,7 +120,7 @@ bool Notification::EvaluateApplyRule(const Checkable::Ptr& checkable, const Appl
 
 		Array::Ptr arr = vinstances;
 
-		ObjectLock olock(arr);
+		RLock olock(arr);
 		for (const Value& instance : arr) {
 			String name = rule.GetName();
 

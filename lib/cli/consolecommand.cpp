@@ -202,7 +202,7 @@ char *ConsoleCommand::ConsoleCompleteHelper(const char *word, int state)
 
 			matches.clear();
 
-			ObjectLock olock(suggestions);
+			RLock olock(suggestions);
 			std::copy(suggestions->Begin(), suggestions->End(), std::back_inserter(matches));
 		}
 	}

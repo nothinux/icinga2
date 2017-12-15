@@ -115,7 +115,7 @@ bool TypeQueryHandler::HandleRequest(const ApiUser::Ptr& user, HttpRequest& requ
 		result1->Set("prototype_keys", prototypeKeys);
 
 		if (prototype) {
-			ObjectLock olock(prototype);
+			RLock olock(prototype);
 			for (const Dictionary::Pair& kv : prototype) {
 				prototypeKeys->Add(kv.first);
 			}

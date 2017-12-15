@@ -66,7 +66,7 @@ std::vector<Type::Ptr> Type::GetAllTypes()
 	Dictionary::Ptr typesNS = ScriptGlobal::Get("Types", &Empty);
 
 	if (typesNS) {
-		ObjectLock olock(typesNS);
+		RLock olock(typesNS);
 
 		for (const Dictionary::Pair& kv : typesNS) {
 			if (kv.second.IsObjectType<Type>())

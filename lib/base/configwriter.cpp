@@ -61,7 +61,7 @@ void ConfigWriter::EmitArrayItems(std::ostream& fp, int indentLevel, const Array
 {
 	bool first = true;
 
-	ObjectLock olock(val);
+	RLock olock(val);
 	for (const Value& item : val) {
 		if (first)
 			first = false;
@@ -78,7 +78,7 @@ void ConfigWriter::EmitScope(std::ostream& fp, int indentLevel, const Dictionary
 	fp << "{";
 
 	if (imports && imports->GetLength() > 0) {
-		ObjectLock xlock(imports);
+		RLock xlock(imports);
 		for (const Value& import : imports) {
 			fp << "\n";
 			EmitIndent(fp, indentLevel);
@@ -89,7 +89,7 @@ void ConfigWriter::EmitScope(std::ostream& fp, int indentLevel, const Dictionary
 	}
 
 	if (val) {
-		ObjectLock olock(val);
+		RLock olock(val);
 		for (const Dictionary::Pair& kv : val) {
 			fp << "\n";
 			EmitIndent(fp, indentLevel);

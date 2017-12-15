@@ -78,16 +78,18 @@ void ApiClient::TypesHttpCompletionCallback(HttpRequest& request, HttpResponse& 
 
 		Array::Ptr results = result->Get("results");
 
-		ObjectLock olock(results);
-		for (const Dictionary::Ptr typeInfo : results)
 		{
-			ApiType::Ptr type = new ApiType();;
-			type->Abstract = typeInfo->Get("abstract");
-			type->BaseName = typeInfo->Get("base");
-			type->Name = typeInfo->Get("name");
-			type->PluralName = typeInfo->Get("plural_name");
-			// TODO: attributes
-			types.emplace_back(std::move(type));
+			RLock olock(results);
+			for (const Dictionary::Ptr typeInfo : results)
+			{
+				ApiType::Ptr type = new ApiType();;
+				type->Abstract = typeInfo->Get("abstract");
+				type->BaseName = typeInfo->Get("base");
+				type->Name = typeInfo->Get("name");
+				type->PluralName = typeInfo->Get("plural_name");
+				// TODO: attributes
+				types.emplace_back(std::move(type));
+			}
 		}
 
 		callback(boost::exception_ptr(), types);
@@ -164,7 +166,7 @@ void ApiClient::ObjectsHttpCompletionCallback(HttpRequest& request,
 		Array::Ptr results = result->Get("results");
 
 		if (results) {
-			ObjectLock olock(results);
+			RLock olock(results);
 			for (const Dictionary::Ptr objectInfo : results) {
 				ApiObject::Ptr object = new ApiObject();
 
@@ -174,7 +176,7 @@ void ApiClient::ObjectsHttpCompletionCallback(HttpRequest& request,
 				Dictionary::Ptr attrs = objectInfo->Get("attrs");
 
 				if (attrs) {
-					ObjectLock olock(attrs);
+					RLock olock(attrs);
 					for (const Dictionary::Pair& kv : attrs) {
 						object->Attrs[object->Type.ToLower() + "." + kv.first] = kv.second;
 					}
@@ -183,12 +185,12 @@ void ApiClient::ObjectsHttpCompletionCallback(HttpRequest& request,
 				Dictionary::Ptr joins = objectInfo->Get("joins");
 
 				if (joins) {
-					ObjectLock olock(joins);
+					RLock olock(joins);
 					for (const Dictionary::Pair& kv : joins) {
 						Dictionary::Ptr attrs = kv.second;
 
 						if (attrs) {
-							ObjectLock olock(attrs);
+							RLock olock(attrs);
 							for (const Dictionary::Pair& kv2 : attrs) {
 								object->Attrs[kv.first + "." + kv2.first] = kv2.second;
 							}
@@ -199,7 +201,7 @@ void ApiClient::ObjectsHttpCompletionCallback(HttpRequest& request,
 				Array::Ptr used_by = objectInfo->Get("used_by");
 
 				if (used_by) {
-					ObjectLock olock(used_by);
+					RLock olock(used_by);
 					for (const Dictionary::Ptr& refInfo : used_by) {
 						ApiObjectReference ref;
 						ref.Name = refInfo->Get("name");

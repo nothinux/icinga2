@@ -182,7 +182,7 @@ std::set<User::Ptr> Notification::GetUsers() const
 	Array::Ptr users = GetUsersRaw();
 
 	if (users) {
-		ObjectLock olock(users);
+		RLock olock(users);
 
 		for (const String& name : users) {
 			User::Ptr user = User::GetByName(name);
@@ -204,7 +204,7 @@ std::set<UserGroup::Ptr> Notification::GetUserGroups() const
 	Array::Ptr groups = GetUserGroupsRaw();
 
 	if (groups) {
-		ObjectLock olock(groups);
+		RLock olock(groups);
 
 		for (const String& name : groups) {
 			UserGroup::Ptr ug = UserGroup::GetByName(name);
@@ -357,7 +357,7 @@ void Notification::BeginExecuteNotification(NotificationType type, const CheckRe
 	}
 
 	{
-		ObjectLock olock(this);
+		WLock olock(this);
 
 		UpdateNotificationNumber();
 		double now = Utility::GetTime();

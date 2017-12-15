@@ -55,29 +55,25 @@ void ScriptGlobal::Set(const String& name, const Value& value)
 	if (tokens.empty())
 		BOOST_THROW_EXCEPTION(std::invalid_argument("Name must not be empty"));
 
-	{
-		ObjectLock olock(m_Globals);
+	Dictionary::Ptr parent = m_Globals;
 
-		Dictionary::Ptr parent = m_Globals;
+	for (std::vector<String>::size_type i = 0; i < tokens.size(); i++) {
+		const String& token = tokens[i];
 
-		for (std::vector<String>::size_type i = 0; i < tokens.size(); i++) {
-			const String& token = tokens[i];
+		if (i + 1 != tokens.size()) {
+			Value vparent;
 
-			if (i + 1 != tokens.size()) {
-				Value vparent;
-
-				if (!parent->Get(token, &vparent)) {
-					Dictionary::Ptr dict = new Dictionary();
-					parent->Set(token, dict);
-					parent = dict;
-				} else {
-					parent = vparent;
-				}
+			if (!parent->Get(token, &vparent)) {
+				Dictionary::Ptr dict = new Dictionary();
+				parent->Set(token, dict);
+				parent = dict;
+			} else {
+				parent = vparent;
 			}
 		}
-
-		parent->Set(tokens[tokens.size() - 1], value);
 	}
+
+	parent->Set(tokens[tokens.size() - 1], value);
 }
 
 bool ScriptGlobal::Exists(const String& name)
@@ -103,7 +99,7 @@ void ScriptGlobal::WriteToFile(const String& filename)
 
 	StdioStream::Ptr sfp = new StdioStream(&fp, false);
 
-	ObjectLock olock(m_Globals);
+	RLock olock(m_Globals);
 	for (const Dictionary::Pair& kv : m_Globals) {
 		Dictionary::Ptr persistentVariable = new Dictionary();
 

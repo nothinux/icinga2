@@ -24,6 +24,7 @@
 #include "base/object.hpp"
 #include "base/type.hpp"
 #include "base/dictionary.hpp"
+#include "base/rw_spin_lock.hpp"
 
 namespace icinga
 {
@@ -40,7 +41,8 @@ public:
 	void RegisterObject(const intrusive_ptr<ConfigObject>& object);
 	void UnregisterObject(const intrusive_ptr<ConfigObject>& object);
 
-	std::vector<intrusive_ptr<ConfigObject> > GetObjects() const;
+	const std::vector<intrusive_ptr<ConfigObject> >& GetObjectsUnlocked(void) const;
+	rw_spin_lock& GetObjectsRWLock(void) const;
 
 	template<typename T>
 	static TypeImpl<T> *Get()
@@ -52,10 +54,13 @@ public:
 	template<typename T>
 	static std::vector<intrusive_ptr<T> > GetObjectsByType()
 	{
-		std::vector<intrusive_ptr<ConfigObject> > objects = GetObjectsHelper(T::TypeInstance.get());
+		auto *ctype = CastTypeHelper(T::TypeInstance.get());
+		RLock lock(ctype->GetObjectsRWLock());
+		const std::vector<intrusive_ptr<ConfigObject> >& objects = ctype->GetObjectsUnlocked();
+
 		std::vector<intrusive_ptr<T> > result;
 		result.reserve(objects.size());
-for (const auto& object : objects) {
+		for (const auto& object : objects) {
 			result.push_back(static_pointer_cast<T>(object));
 		}
 		return result;
@@ -67,11 +72,11 @@ private:
 	typedef std::map<String, intrusive_ptr<ConfigObject> > ObjectMap;
 	typedef std::vector<intrusive_ptr<ConfigObject> > ObjectVector;
 
-	mutable boost::mutex m_Mutex;
+	mutable rw_spin_lock m_RWLock;
 	ObjectMap m_ObjectMap;
 	ObjectVector m_ObjectVector;
 
-	static std::vector<intrusive_ptr<ConfigObject> > GetObjectsHelper(Type *type);
+	static ConfigType *CastTypeHelper(Type *type);
 };
 
 }

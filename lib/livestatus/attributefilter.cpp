@@ -43,7 +43,7 @@ bool AttributeFilter::Apply(const Table::Ptr& table, const Value& row)
 		if (m_Operator == ">=" || m_Operator == "<") {
 			bool negate = (m_Operator == "<");
 
-			ObjectLock olock(array);
+			RLock olock(array);
 			for (const String& item : array) {
 				if (item == m_Operand)
 					return !negate; /* Item found in list. */

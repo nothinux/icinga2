@@ -89,10 +89,12 @@ static variant_t InvokeClrMethod(const variant_t& vtObject, const String& method
 	mscorlib::IDictionaryPtr pHashtable;
 	CoCreateInstance(clsid, nullptr, CLSCTX_ALL, __uuidof(mscorlib::IDictionary), (void **)&pHashtable);
 
-	ObjectLock olock(args);
-	for (const Dictionary::Pair& kv : args) {
-		String value = kv.second;
-		pHashtable->Add(kv.first.CStr(), value.CStr());
+	{
+		RLock olock(args);
+		for (const Dictionary::Pair& kv : args) {
+			String value = kv.second;
+			pHashtable->Add(kv.first.CStr(), value.CStr());
+		}
 	}
 
 	mscorlib::_ObjectPtr pObject;
@@ -166,7 +168,7 @@ void ClrCheckTask::ScriptFunc(const Checkable::Ptr& checkable, const CheckResult
 	Dictionary::Ptr env = commandObj->GetEnv();
 
 	if (env) {
-		ObjectLock olock(env);
+		RLock olock(env);
 		for (const Dictionary::Pair& kv : env) {
 			String name = kv.second;
 

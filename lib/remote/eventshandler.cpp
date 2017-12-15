@@ -51,7 +51,7 @@ bool EventsHandler::HandleRequest(const ApiUser::Ptr& user, HttpRequest& request
 	}
 
 	{
-		ObjectLock olock(types);
+		RLock olock(types);
 		for (const String& type : types) {
 			FilterUtility::CheckPermission(user, "events/" + type);
 		}

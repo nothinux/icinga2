@@ -43,10 +43,12 @@ static void EncodeDictionary(yajl_gen handle, const Dictionary::Ptr& dict)
 {
 	yajl_gen_map_open(handle);
 
-	ObjectLock olock(dict);
-	for (const Dictionary::Pair& kv : dict) {
-		yajl_gen_string(handle, reinterpret_cast<const unsigned char *>(kv.first.CStr()), kv.first.GetLength());
-		Encode(handle, kv.second);
+	{
+		RLock olock(dict);
+		for (const Dictionary::Pair& kv : dict) {
+			yajl_gen_string(handle, reinterpret_cast<const unsigned char *>(kv.first.CStr()), kv.first.GetLength());
+			Encode(handle, kv.second);
+		}
 	}
 
 	yajl_gen_map_close(handle);
@@ -56,9 +58,11 @@ static void EncodeArray(yajl_gen handle, const Array::Ptr& arr)
 {
 	yajl_gen_array_open(handle);
 
-	ObjectLock olock(arr);
-	for (const Value& value : arr) {
-		Encode(handle, value);
+	{
+		RLock olock(arr);
+		for (const Value& value : arr) {
+			Encode(handle, value);
+		}
 	}
 
 	yajl_gen_array_close(handle);

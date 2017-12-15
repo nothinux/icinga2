@@ -28,7 +28,7 @@ ConfigType::~ConfigType()
 
 ConfigObject::Ptr ConfigType::GetObject(const String& name) const
 {
-	boost::mutex::scoped_lock lock(m_Mutex);
+	RLock lock(m_RWLock);
 
 	auto nt = m_ObjectMap.find(name);
 
@@ -42,25 +42,23 @@ void ConfigType::RegisterObject(const ConfigObject::Ptr& object)
 {
 	String name = object->GetName();
 
-	{
-		boost::mutex::scoped_lock lock(m_Mutex);
+	WLock lock(m_RWLock);
 
-		auto it = m_ObjectMap.find(name);
+	auto it = m_ObjectMap.find(name);
 
-		if (it != m_ObjectMap.end()) {
-			if (it->second == object)
-				return;
+	if (it != m_ObjectMap.end()) {
+		if (it->second == object)
+			return;
 
-			auto *type = dynamic_cast<Type *>(this);
+		auto *type = dynamic_cast<Type *>(this);
 
-			BOOST_THROW_EXCEPTION(ScriptError("An object with type '" + type->GetName() + "' and name '" + name + "' already exists (" +
-				Convert::ToString(it->second->GetDebugInfo()) + "), new declaration: " + Convert::ToString(object->GetDebugInfo()),
-				object->GetDebugInfo()));
-		}
-
-		m_ObjectMap[name] = object;
-		m_ObjectVector.push_back(object);
+		BOOST_THROW_EXCEPTION(ScriptError("An object with type '" + type->GetName() + "' and name '" + name + "' already exists (" +
+			Convert::ToString(it->second->GetDebugInfo()) + "), new declaration: " + Convert::ToString(object->GetDebugInfo()),
+			object->GetDebugInfo()));
 	}
+
+	m_ObjectMap.emplace(std::move(name), object);
+	m_ObjectVector.push_back(object);
 }
 
 void ConfigType::UnregisterObject(const ConfigObject::Ptr& object)
@@ -68,26 +66,30 @@ void ConfigType::UnregisterObject(const ConfigObject::Ptr& object)
 	String name = object->GetName();
 
 	{
-		boost::mutex::scoped_lock lock(m_Mutex);
+		WLock lock(m_RWLock);
 
 		m_ObjectMap.erase(name);
 		m_ObjectVector.erase(std::remove(m_ObjectVector.begin(), m_ObjectVector.end(), object), m_ObjectVector.end());
 	}
 }
 
-std::vector<ConfigObject::Ptr> ConfigType::GetObjects() const
+const std::vector<intrusive_ptr<ConfigObject> >& ConfigType::GetObjectsUnlocked(void) const
 {
-	boost::mutex::scoped_lock lock(m_Mutex);
 	return m_ObjectVector;
 }
 
-std::vector<ConfigObject::Ptr> ConfigType::GetObjectsHelper(Type *type)
+rw_spin_lock& ConfigType::GetObjectsRWLock(void) const
 {
-	return static_cast<TypeImpl<ConfigObject> *>(type)->GetObjects();
+	return m_RWLock;
+}
+
+ConfigType *ConfigType::CastTypeHelper(Type *type)
+{
+	return static_cast<ConfigType *>(static_cast<TypeImpl<ConfigObject> *>(type));
 }
 
 int ConfigType::GetObjectCount() const
 {
-	boost::mutex::scoped_lock lock(m_Mutex);
+	RLock lock(m_RWLock);
 	return m_ObjectVector.size();
 }

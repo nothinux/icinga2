@@ -22,6 +22,7 @@
 #include "base/initialize.hpp"
 #include "base/logger.hpp"
 #include "base/scriptglobal.hpp"
+#include <iostream>
 
 using namespace icinga;
 
@@ -39,6 +40,8 @@ INITIALIZE_ONCE([]() {
 int HelloApplication::Main()
 {
 	Log(LogInformation, "HelloApplication", "Hello World!");
+
+	std::cout << sizeof(Object) << "\n";
 
 	return 0;
 }

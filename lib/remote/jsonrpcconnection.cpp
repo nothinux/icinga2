@@ -113,7 +113,7 @@ ConnectionRole JsonRpcConnection::GetRole() const
 void JsonRpcConnection::SendMessage(const Dictionary::Ptr& message)
 {
 	try {
-		ObjectLock olock(m_Stream);
+		WLock olock(m_Stream);
 		if (m_Stream->IsEof())
 			return;
 		size_t bytesSent = JsonRpc::SendMessage(m_Stream, message);

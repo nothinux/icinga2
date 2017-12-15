@@ -427,7 +427,8 @@ void DbConnection::UpdateAllObjects()
 		if (!dtype)
 			continue;
 
-		for (const ConfigObject::Ptr& object : dtype->GetObjects()) {
+		RLock lock(dtype->GetObjectsRWLock());
+		for (const ConfigObject::Ptr& object : dtype->GetObjectsUnlocked()) {
 			UpdateObject(object);
 		}
 	}

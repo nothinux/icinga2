@@ -211,9 +211,11 @@ bool NodeUtility::WriteNodeConfigObjects(const String& filename, const Array::Pt
 	fp << " * on " << Utility::FormatDateTime("%Y-%m-%d %H:%M:%S %z", Utility::GetTime()) << "\n";
 	fp << " */\n\n";
 
-	ObjectLock olock(objects);
-	for (const Dictionary::Ptr& object : objects) {
-		SerializeObject(fp, object);
+	{
+		RLock olock(objects);
+		for (const Dictionary::Ptr& object : objects) {
+			SerializeObject(fp, object);
+		}
 	}
 
 	fp << std::endl;
@@ -271,7 +273,7 @@ void NodeUtility::SerializeObject(std::ostream& fp, const Dictionary::Ptr& objec
 	ConfigWriter::EmitValue(fp, 0, object->Get("__name"));
 	fp << " {\n";
 
-	ObjectLock olock(object);
+	RLock olock(object);
 	for (const Dictionary::Pair& kv : object) {
 		if (kv.first == "__type" || kv.first == "__name")
 			continue;

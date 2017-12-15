@@ -22,9 +22,10 @@
 
 #include "base/i2-base.hpp"
 #include "base/debug.hpp"
-#include <boost/thread/condition_variable.hpp>
+#include "base/rw_spin_lock.hpp"
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <vector>
+#include <atomic>
 
 using boost::intrusive_ptr;
 using boost::dynamic_pointer_cast;
@@ -110,7 +111,7 @@ public:
 	DECLARE_PTR_TYPEDEFS(Object);
 
 	Object() = default;
-	virtual ~Object();
+	virtual ~Object() = default;
 
 	virtual String ToString() const;
 
@@ -128,10 +129,6 @@ public:
 	virtual void NotifyField(int id, const Value& cookie = Empty);
 	virtual Object::Ptr NavigateField(int id) const;
 
-#ifdef I2_DEBUG
-	bool OwnsLock() const;
-#endif /* I2_DEBUG */
-
 	static Object::Ptr GetPrototype();
 
 	virtual Object::Ptr Clone() const;
@@ -142,18 +139,11 @@ private:
 	Object(const Object& other) = delete;
 	Object& operator=(const Object& rhs) = delete;
 
-	uintptr_t m_References{0};
-	mutable uintptr_t m_Mutex{0};
+	std::atomic<uint32_t> m_References;
+	mutable rw_spin_lock m_RWLock;
 
-#ifdef I2_DEBUG
-#	ifndef _WIN32
-	mutable pthread_t m_LockOwner;
-#	else /* _WIN32 */
-	mutable DWORD m_LockOwner;
-#	endif /* _WIN32 */
-#endif /* I2_DEBUG */
-
-	friend struct ObjectLock;
+	friend struct RLock;
+	friend struct WLock;
 
 	friend void intrusive_ptr_add_ref(Object *object);
 	friend void intrusive_ptr_release(Object *object);

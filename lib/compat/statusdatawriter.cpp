@@ -138,7 +138,7 @@ void StatusDataWriter::DumpTimePeriod(std::ostream& fp, const TimePeriod::Ptr& t
 	Dictionary::Ptr ranges = tp->GetRanges();
 
 	if (ranges) {
-		ObjectLock olock(ranges);
+		RLock olock(ranges);
 		for (const Dictionary::Pair& kv : ranges) {
 			fp << "\t" << kv.first << "\t" << kv.second << "\n";
 		}
@@ -206,7 +206,7 @@ void StatusDataWriter::DumpHostStatus(std::ostream& fp, const Host::Ptr& host)
 	fp << "hoststatus {" "\n" "\t" "host_name=" << host->GetName() << "\n";
 
 	{
-		ObjectLock olock(host);
+		RLock olock(host);
 		DumpCheckableStatusAttrs(fp, host);
 	}
 
@@ -261,7 +261,7 @@ void StatusDataWriter::DumpHostObject(std::ostream& fp, const Host::Ptr& host)
 		fp << "\n";
 	}
 
-	ObjectLock olock(host);
+	RLock olock(host);
 
 	fp << "\t" "check_interval" "\t" << CompatUtility::GetCheckableCheckInterval(host) << "\n"
 		"\t" "retry_interval" "\t" << CompatUtility::GetCheckableRetryInterval(host) << "\n"
@@ -303,7 +303,7 @@ void StatusDataWriter::DumpHostObject(std::ostream& fp, const Host::Ptr& host)
 	Array::Ptr groups = host->GetGroups();
 
 	if (groups) {
-		ObjectLock olock(groups);
+		RLock olock(groups);
 
 		for (const String& name : groups) {
 			HostGroup::Ptr hg = HostGroup::GetByName(name);
@@ -406,7 +406,7 @@ void StatusDataWriter::DumpServiceStatus(std::ostream& fp, const Service::Ptr& s
 		"\t" "service_description=" << service->GetShortName() << "\n";
 
 	{
-		ObjectLock olock(service);
+		RLock olock(service);
 		DumpCheckableStatusAttrs(fp, service);
 	}
 
@@ -421,7 +421,7 @@ void StatusDataWriter::DumpServiceObject(std::ostream& fp, const Service::Ptr& s
 	Host::Ptr host = service->GetHost();
 
 	{
-		ObjectLock olock(service);
+		RLock olock(service);
 
 		fp << "define service {" "\n"
 			"\t" "host_name" "\t" << host->GetName() << "\n"
@@ -486,7 +486,7 @@ void StatusDataWriter::DumpServiceObject(std::ostream& fp, const Service::Ptr& s
 	Array::Ptr groups = service->GetGroups();
 
 	if (groups) {
-		ObjectLock olock(groups);
+		RLock olock(groups);
 
 		for (const String& name : groups) {
 			ServiceGroup::Ptr sg = ServiceGroup::GetByName(name);
@@ -518,7 +518,7 @@ void StatusDataWriter::DumpCustomAttributes(std::ostream& fp, const CustomVarObj
 
 	bool is_json = false;
 
-	ObjectLock olock(vars);
+	RLock olock(vars);
 	for (const Dictionary::Pair& kv : vars) {
 		if (kv.first.IsEmpty())
 			continue;

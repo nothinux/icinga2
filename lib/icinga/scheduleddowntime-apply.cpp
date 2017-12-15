@@ -119,7 +119,7 @@ bool ScheduledDowntime::EvaluateApplyRule(const Checkable::Ptr& checkable, const
 
 		Array::Ptr arr = vinstances;
 
-		ObjectLock olock(arr);
+		RLock olock(arr);
 		for (const Value& instance : arr) {
 			String name = rule.GetName();
 

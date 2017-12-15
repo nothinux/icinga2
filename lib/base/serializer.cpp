@@ -26,28 +26,29 @@ using namespace icinga;
 
 static Array::Ptr SerializeArray(const Array::Ptr& input, int attributeTypes)
 {
-	Array::Ptr result = new Array();
+	std::vector<Value> result;
+	result.reserve(input->GetLength());
 
-	ObjectLock olock(input);
+	{
+		RLock olock(input);
 
-	for (const Value& value : input) {
-		result->Add(Serialize(value, attributeTypes));
+		for (const Value& value : input)
+			result.push_back(Serialize(value, attributeTypes));
 	}
 
-	return result;
+	return new Array(std::move(result));
 }
 
 static Dictionary::Ptr SerializeDictionary(const Dictionary::Ptr& input, int attributeTypes)
 {
-	Dictionary::Ptr result = new Dictionary();
+	std::map<String, Value> result;
 
-	ObjectLock olock(input);
+	RLock olock(input);
 
-	for (const Dictionary::Pair& kv : input) {
-		result->Set(kv.first, Serialize(kv.second, attributeTypes));
-	}
+	for (const Dictionary::Pair& kv : input)
+		result.emplace(kv.first, Serialize(kv.second, attributeTypes));
 
-	return result;
+	return new Dictionary(std::move(result));
 }
 
 static Object::Ptr SerializeObject(const Object::Ptr& input, int attributeTypes)
@@ -57,7 +58,7 @@ static Object::Ptr SerializeObject(const Object::Ptr& input, int attributeTypes)
 	if (!type)
 		return nullptr;
 
-	Dictionary::Ptr fields = new Dictionary();
+	std::map<String, Value> fields;
 
 	for (int i = 0; i < type->GetFieldCount(); i++) {
 		Field field = type->GetFieldInfo(i);
@@ -65,32 +66,34 @@ static Object::Ptr SerializeObject(const Object::Ptr& input, int attributeTypes)
 		if (attributeTypes != 0 && (field.Attributes & attributeTypes) == 0)
 			continue;
 
-		fields->Set(field.Name, Serialize(input->GetField(i), attributeTypes));
+		fields.emplace(field.Name, Serialize(input->GetField(i), attributeTypes));
 	}
 
-	fields->Set("type", type->GetName());
+	fields.emplace("type", type->GetName());
 
-	return fields;
+	return new Dictionary(std::move(fields));
 }
 
 static Array::Ptr DeserializeArray(const Array::Ptr& input, bool safe_mode, int attributeTypes)
 {
-	Array::Ptr result = new Array();
+	std::vector<Value> result;
 
-	ObjectLock olock(input);
-
-	for (const Value& value : input) {
-		result->Add(Deserialize(value, safe_mode, attributeTypes));
+	{
+		RLock olock(input);
+		result.reserve(input->GetLength());
+		for (const Value& value : input) {
+			result.push_back(Deserialize(value, safe_mode, attributeTypes));
+		}
 	}
 
-	return result;
+	return new Array(std::move(result));
 }
 
 static Dictionary::Ptr DeserializeDictionary(const Dictionary::Ptr& input, bool safe_mode, int attributeTypes)
 {
 	Dictionary::Ptr result = new Dictionary();
 
-	ObjectLock olock(input);
+	RLock olock(input);
 
 	for (const Dictionary::Pair& kv : input) {
 		result->Set(kv.first, Deserialize(kv.second, safe_mode, attributeTypes));
@@ -121,7 +124,7 @@ static Object::Ptr DeserializeObject(const Object::Ptr& object, const Dictionary
 	else
 		instance = type->Instantiate(std::vector<Value>());
 
-	ObjectLock olock(input);
+	RLock olock(input);
 	for (const Dictionary::Pair& kv : input) {
 		if (kv.first.IsEmpty())
 			continue;

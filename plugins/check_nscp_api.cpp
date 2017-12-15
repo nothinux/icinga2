@@ -165,7 +165,7 @@ static int FormatOutput(const Dictionary::Ptr& result)
 	}
 
 	std::stringstream ssout;
-	ObjectLock olock(lines);
+	RLock olock(lines);
 
 	for (const Value& vline : lines) {
 		Dictionary::Ptr line;
@@ -188,7 +188,7 @@ static int FormatOutput(const Dictionary::Ptr& result)
 		}
 
 		Array::Ptr perfs = line->Get("perf");
-		ObjectLock olock(perfs);
+		RLock olock(perfs);
 
 		for (const Dictionary::Ptr& perf : perfs) {
 			ssout << "'" << perf->Get("alias") << "'=";

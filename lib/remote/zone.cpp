@@ -39,7 +39,7 @@ void Zone::OnAllConfigLoaded()
 	Array::Ptr endpoints = GetEndpointsRaw();
 
 	if (endpoints) {
-		ObjectLock olock(endpoints);
+		RLock olock(endpoints);
 		for (const String& endpoint : endpoints) {
 			Endpoint::Ptr ep = Endpoint::GetByName(endpoint);
 
@@ -71,7 +71,7 @@ std::set<Endpoint::Ptr> Zone::GetEndpoints() const
 	Array::Ptr endpoints = GetEndpointsRaw();
 
 	if (endpoints) {
-		ObjectLock olock(endpoints);
+		RLock olock(endpoints);
 
 		for (const String& name : endpoints) {
 			Endpoint::Ptr endpoint = Endpoint::GetByName(name);

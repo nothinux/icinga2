@@ -239,7 +239,7 @@ Value StatusTable::CustomVariableNamesAccessor(const Value&)
 		return cv;
 
 	{
-		ObjectLock olock(vars);
+		RLock olock(vars);
 		for (const auto& kv : vars) {
 			cv->Add(kv.first);
 		}
@@ -258,7 +258,7 @@ Value StatusTable::CustomVariableValuesAccessor(const Value&)
 		return cv;
 
 	{
-		ObjectLock olock(vars);
+		RLock olock(vars);
 		for (const auto& kv : vars) {
 			cv->Add(kv.second);
 		}
@@ -277,7 +277,7 @@ Value StatusTable::CustomVariablesAccessor(const Value&)
 		return cv;
 
 	{
-		ObjectLock olock(vars);
+		RLock olock(vars);
 		for (const auto& kv : vars) {
 			Array::Ptr key_val = new Array();
 			key_val->Add(kv.first);

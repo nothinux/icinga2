@@ -45,7 +45,7 @@ static Value FunctionCallV(const Value& thisArg, const Array::Ptr& args)
 	std::vector<Value> uargs;
 
 	{
-		ObjectLock olock(args);
+		RLock olock(args);
 		uargs = std::vector<Value>(args->Begin(), args->End());
 	}
 

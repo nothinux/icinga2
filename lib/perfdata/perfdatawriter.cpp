@@ -108,7 +108,7 @@ void PerfdataWriter::CheckResultHandler(const Checkable::Ptr& checkable, const C
 		String line = MacroProcessor::ResolveMacros(GetServiceFormatTemplate(), resolvers, cr, nullptr, &PerfdataWriter::EscapeMacroMetric);
 
 		{
-			ObjectLock olock(this);
+			WLock olock(this);
 			if (!m_ServiceOutputFile.good())
 				return;
 
@@ -118,7 +118,7 @@ void PerfdataWriter::CheckResultHandler(const Checkable::Ptr& checkable, const C
 		String line = MacroProcessor::ResolveMacros(GetHostFormatTemplate(), resolvers, cr, nullptr, &PerfdataWriter::EscapeMacroMetric);
 
 		{
-			ObjectLock olock(this);
+			WLock olock(this);
 			if (!m_HostOutputFile.good())
 				return;
 
@@ -129,7 +129,7 @@ void PerfdataWriter::CheckResultHandler(const Checkable::Ptr& checkable, const C
 
 void PerfdataWriter::RotateFile(std::ofstream& output, const String& temp_path, const String& perfdata_path)
 {
-	ObjectLock olock(this);
+	WLock olock(this);
 
 	if (output.good()) {
 		output.close();

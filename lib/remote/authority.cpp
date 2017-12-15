@@ -63,7 +63,8 @@ void ApiListener::UpdateObjectAuthority()
 		if (!dtype)
 			continue;
 
-		for (const ConfigObject::Ptr& object : dtype->GetObjects()) {
+		RLock lock(dtype->GetObjectsRWLock());
+		for (const ConfigObject::Ptr& object : dtype->GetObjectsUnlocked()) {
 			if (!object->IsActive() || object->GetHAMode() != HARunOnce)
 				continue;
 

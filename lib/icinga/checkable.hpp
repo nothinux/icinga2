@@ -231,7 +231,7 @@ private:
 	mutable boost::mutex m_NotificationMutex;
 
 	/* Dependencies */
-	mutable boost::mutex m_DependencyMutex;
+	mutable rw_spin_lock m_DependencyRWLock;
 	std::set<intrusive_ptr<Dependency> > m_Dependencies;
 	std::set<intrusive_ptr<Dependency> > m_ReverseDependencies;
 

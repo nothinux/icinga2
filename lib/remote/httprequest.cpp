@@ -178,7 +178,7 @@ void HttpRequest::FinishHeaders()
 				AddHeader("Host", RequestUrl->GetHost() + ":" + RequestUrl->GetPort());
 		}
 
-		ObjectLock olock(Headers);
+		RLock olock(Headers);
 		for (const Dictionary::Pair& kv : Headers)
 		{
 			String header = kv.first + ": " + kv.second + "\n";

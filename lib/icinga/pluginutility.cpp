@@ -68,7 +68,7 @@ void PluginUtility::ExecuteCommand(const Command::Ptr& commandObj, const Checkab
 	Dictionary::Ptr env = commandObj->GetEnv();
 
 	if (env) {
-		ObjectLock olock(env);
+		RLock olock(env);
 		for (const Dictionary::Pair& kv : env) {
 			String name = kv.second;
 
@@ -200,7 +200,7 @@ String PluginUtility::FormatPerfdata(const Array::Ptr& perfdata)
 
 	std::ostringstream result;
 
-	ObjectLock olock(perfdata);
+	RLock olock(perfdata);
 
 	bool first = true;
 	for (const Value& pdv : perfdata) {

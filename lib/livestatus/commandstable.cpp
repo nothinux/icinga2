@@ -102,7 +102,7 @@ Value CommandsTable::CustomVariableNamesAccessor(const Value& row)
 	Dictionary::Ptr vars;
 
 	{
-		ObjectLock olock(command);
+		RLock olock(command);
 		vars = CompatUtility::GetCustomAttributeConfig(command);
 	}
 
@@ -112,7 +112,7 @@ Value CommandsTable::CustomVariableNamesAccessor(const Value& row)
 		return cv;
 
 	{
-		ObjectLock xlock(vars);
+		RLock xlock(vars);
 		for (const auto& kv : vars) {
 			cv->Add(kv.first);
 		}
@@ -131,7 +131,7 @@ Value CommandsTable::CustomVariableValuesAccessor(const Value& row)
 	Dictionary::Ptr vars;
 
 	{
-		ObjectLock olock(command);
+		RLock olock(command);
 		vars = CompatUtility::GetCustomAttributeConfig(command);
 	}
 
@@ -141,7 +141,7 @@ Value CommandsTable::CustomVariableValuesAccessor(const Value& row)
 		return cv;
 
 	{
-		ObjectLock xlock(vars);
+		RLock xlock(vars);
 		for (const auto& kv : vars) {
 			cv->Add(kv.second);
 		}
@@ -160,7 +160,7 @@ Value CommandsTable::CustomVariablesAccessor(const Value& row)
 	Dictionary::Ptr vars;
 
 	{
-		ObjectLock olock(command);
+		RLock olock(command);
 		vars = CompatUtility::GetCustomAttributeConfig(command);
 	}
 
@@ -170,7 +170,7 @@ Value CommandsTable::CustomVariablesAccessor(const Value& row)
 		return cv;
 
 	{
-		ObjectLock xlock(vars);
+		RLock xlock(vars);
 		for (const auto& kv : vars) {
 			Array::Ptr key_val = new Array();
 			key_val->Add(kv.first);

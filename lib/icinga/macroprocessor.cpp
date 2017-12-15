@@ -51,7 +51,7 @@ Value MacroProcessor::ResolveMacros(const Value& str, const ResolverList& resolv
 		Array::Ptr resultArr = new Array();
 		Array::Ptr arr = str;
 
-		ObjectLock olock(arr);
+		RLock olock(arr);
 
 		for (const Value& arg : arr) {
 			/* Note: don't escape macros here. */
@@ -69,7 +69,7 @@ Value MacroProcessor::ResolveMacros(const Value& str, const ResolverList& resolv
 		Dictionary::Ptr resultDict = new Dictionary();
 		Dictionary::Ptr dict = str;
 
-		ObjectLock olock(dict);
+		RLock olock(dict);
 
 		for (const Dictionary::Pair& kv : dict) {
 			/* Note: don't escape macros here. */
@@ -277,7 +277,7 @@ Value MacroProcessor::InternalResolveMacros(const String& str, const ResolverLis
 				Array::Ptr arr = resolved_macro;
 				Array::Ptr resolved_arr = new Array();
 
-				ObjectLock olock(arr);
+				RLock olock(arr);
 				for (const Value& value : arr) {
 					if (value.IsScalar()) {
 						resolved_arr->Add(InternalResolveMacros(value,
@@ -351,7 +351,7 @@ void MacroProcessor::ValidateCustomVars(const ConfigObject::Ptr& object, const D
 		return;
 
 	/* string, array, dictionary */
-	ObjectLock olock(value);
+	RLock olock(value);
 	for (const Dictionary::Pair& kv : value) {
 		const Value& varval = kv.second;
 
@@ -359,7 +359,7 @@ void MacroProcessor::ValidateCustomVars(const ConfigObject::Ptr& object, const D
 			/* only one dictonary level */
 			Dictionary::Ptr varval_dict = varval;
 
-			ObjectLock xlock(varval_dict);
+			RLock xlock(varval_dict);
 			for (const Dictionary::Pair& kv_var : varval_dict) {
 				if (!kv_var.second.IsString())
 					continue;
@@ -371,7 +371,7 @@ void MacroProcessor::ValidateCustomVars(const ConfigObject::Ptr& object, const D
 			/* check all array entries */
 			Array::Ptr varval_arr = varval;
 
-			ObjectLock ylock (varval_arr);
+			RLock ylock (varval_arr);
 			for (const Value& arrval : varval_arr) {
 				if (!arrval.IsString())
 					continue;
@@ -407,7 +407,7 @@ Value MacroProcessor::EscapeMacroShellArg(const Value& value)
 	if (value.IsObjectType<Array>()) {
 		Array::Ptr arr = value;
 
-		ObjectLock olock(arr);
+		RLock olock(arr);
 		for (const Value& arg : arr) {
 			if (result.GetLength() > 0)
 				result += " ";
@@ -452,7 +452,7 @@ Value MacroProcessor::ResolveArguments(const Value& command, const Dictionary::P
 	if (arguments) {
 		std::vector<CommandArgument> args;
 
-		ObjectLock olock(arguments);
+		RLock olock(arguments);
 		for (const Dictionary::Pair& kv : arguments) {
 			const Value& arginfo = kv.second;
 
@@ -543,7 +543,7 @@ Value MacroProcessor::ResolveArguments(const Value& command, const Dictionary::P
 				bool first = true;
 				Array::Ptr arr = static_cast<Array::Ptr>(arg.AValue);
 
-				ObjectLock olock(arr);
+				RLock olock(arr);
 				for (const Value& value : arr) {
 					bool add_key;
 

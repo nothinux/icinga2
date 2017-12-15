@@ -123,9 +123,7 @@ void Application::Exit(int rc)
 	std::cout.flush();
 	std::cerr.flush();
 
-	for (const Logger::Ptr& logger : Logger::GetLoggers()) {
-		logger->Flush();
-	}
+	Logger::FlushAll();
 
 	UninitializeBase();
 #ifdef I2_DEBUG
@@ -990,7 +988,7 @@ int Application::Run()
  */
 void Application::UpdatePidFile(const String& filename, pid_t pid)
 {
-	ObjectLock olock(this);
+	boost::mutex::scoped_lock xlock(m_PidMutex);
 
 	if (m_PidFile)
 		fclose(m_PidFile);
@@ -1045,7 +1043,7 @@ void Application::UpdatePidFile(const String& filename, pid_t pid)
  */
 void Application::ClosePidFile(bool unlink)
 {
-	ObjectLock olock(this);
+	boost::mutex::scoped_lock xlock(m_PidMutex);
 
 	if (m_PidFile) {
 		if (unlink) {

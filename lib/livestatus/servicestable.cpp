@@ -176,9 +176,9 @@ void ServicesTable::FetchRows(const AddRowFunction& addRowFn)
 		}
 	} else if (GetGroupByType() == LivestatusGroupByHostGroup) {
 		for (const HostGroup::Ptr& hg : ConfigType::GetObjectsByType<HostGroup>()) {
-			ObjectLock ylock(hg);
+			RLock ylock(hg);
 			for (const Host::Ptr& host : hg->GetMembers()) {
-				ObjectLock ylock(host);
+				RLock ylock(host);
 				for (const Service::Ptr& service : host->GetServices()) {
 					/* the caller must know which groupby type and value are set for this row */
 					if (!addRowFn(service, LivestatusGroupByHostGroup, hg))
@@ -559,7 +559,7 @@ Value ServicesTable::AcknowledgedAccessor(const Value& row)
 	if (!service)
 		return Empty;
 
-	ObjectLock olock(service);
+	RLock olock(service);
 	return CompatUtility::GetCheckableIsAcknowledged(service);
 }
 
@@ -570,7 +570,7 @@ Value ServicesTable::AcknowledgementTypeAccessor(const Value& row)
 	if (!service)
 		return Empty;
 
-	ObjectLock olock(service);
+	RLock olock(service);
 	return CompatUtility::GetCheckableAcknowledgementType(service);
 }
 
@@ -1055,7 +1055,7 @@ Value ServicesTable::CustomVariableNamesAccessor(const Value& row)
 	Dictionary::Ptr vars;
 
 	{
-		ObjectLock olock(service);
+		RLock olock(service);
 		vars = CompatUtility::GetCustomAttributeConfig(service);
 	}
 
@@ -1064,7 +1064,7 @@ Value ServicesTable::CustomVariableNamesAccessor(const Value& row)
 	if (!vars)
 		return cv;
 
-	ObjectLock olock(vars);
+	RLock olock(vars);
 	for (const Dictionary::Pair& kv : vars) {
 		cv->Add(kv.first);
 	}
@@ -1082,7 +1082,7 @@ Value ServicesTable::CustomVariableValuesAccessor(const Value& row)
 	Dictionary::Ptr vars;
 
 	{
-		ObjectLock olock(service);
+		RLock olock(service);
 		vars = CompatUtility::GetCustomAttributeConfig(service);
 	}
 
@@ -1091,7 +1091,7 @@ Value ServicesTable::CustomVariableValuesAccessor(const Value& row)
 	if (!vars)
 		return cv;
 
-	ObjectLock olock(vars);
+	RLock olock(vars);
 	for (const Dictionary::Pair& kv : vars) {
 		if (kv.second.IsObjectType<Array>() || kv.second.IsObjectType<Dictionary>())
 			cv->Add(JsonEncode(kv.second));
@@ -1112,7 +1112,7 @@ Value ServicesTable::CustomVariablesAccessor(const Value& row)
 	Dictionary::Ptr vars;
 
 	{
-		ObjectLock olock(service);
+		RLock olock(service);
 		vars = CompatUtility::GetCustomAttributeConfig(service);
 	}
 
@@ -1121,7 +1121,7 @@ Value ServicesTable::CustomVariablesAccessor(const Value& row)
 	if (!vars)
 		return cv;
 
-	ObjectLock olock(vars);
+	RLock olock(vars);
 	for (const Dictionary::Pair& kv : vars) {
 		Array::Ptr key_val = new Array();
 		key_val->Add(kv.first);
@@ -1147,7 +1147,7 @@ Value ServicesTable::CVIsJsonAccessor(const Value& row)
 	Dictionary::Ptr vars;
 
 	{
-		ObjectLock olock(service);
+		RLock olock(service);
 		vars = CompatUtility::GetCustomAttributeConfig(service);
 	}
 
@@ -1156,7 +1156,7 @@ Value ServicesTable::CVIsJsonAccessor(const Value& row)
 
 	bool cv_is_json = false;
 
-	ObjectLock olock(vars);
+	RLock olock(vars);
 	for (const Dictionary::Pair& kv : vars) {
 		if (kv.second.IsObjectType<Array>() || kv.second.IsObjectType<Dictionary>())
 			cv_is_json = true;

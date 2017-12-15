@@ -79,7 +79,7 @@ public:
 
 	virtual void Flush() = 0;
 
-	static std::set<Logger::Ptr> GetLoggers();
+	static void FlushAll(void);
 
 	static void DisableConsoleLog();
 	static void EnableConsoleLog();
@@ -97,11 +97,13 @@ protected:
 	void Stop(bool runtimeRemoved) override;
 
 private:
-	static boost::mutex m_Mutex;
+	static rw_spin_lock m_RWLock;
 	static std::set<Logger::Ptr> m_Loggers;
 	static bool m_ConsoleLogEnabled;
 	static bool m_TimestampEnabled;
 	static LogSeverity m_ConsoleLogSeverity;
+
+	friend class Log;
 };
 
 class Log

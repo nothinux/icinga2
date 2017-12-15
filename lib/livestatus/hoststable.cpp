@@ -511,7 +511,7 @@ Value HostsTable::AcknowledgementTypeAccessor(const Value& row)
 	if (!host)
 		return Empty;
 
-	ObjectLock olock(host);
+	RLock olock(host);
 	return CompatUtility::GetCheckableAcknowledgementType(host);
 }
 
@@ -652,7 +652,7 @@ Value HostsTable::AcknowledgedAccessor(const Value& row)
 	if (!host)
 		return Empty;
 
-	ObjectLock olock(host);
+	RLock olock(host);
 	return CompatUtility::GetCheckableIsAcknowledged(host);
 }
 
@@ -1016,7 +1016,7 @@ Value HostsTable::CustomVariableNamesAccessor(const Value& row)
 	Dictionary::Ptr vars;
 
 	{
-		ObjectLock olock(host);
+		RLock olock(host);
 		vars = CompatUtility::GetCustomAttributeConfig(host);
 	}
 
@@ -1025,7 +1025,7 @@ Value HostsTable::CustomVariableNamesAccessor(const Value& row)
 	if (!vars)
 		return cv;
 
-	ObjectLock olock(vars);
+	RLock olock(vars);
 	for (const Dictionary::Pair& kv : vars) {
 		cv->Add(kv.first);
 	}
@@ -1043,7 +1043,7 @@ Value HostsTable::CustomVariableValuesAccessor(const Value& row)
 	Dictionary::Ptr vars;
 
 	{
-		ObjectLock olock(host);
+		RLock olock(host);
 		vars = CompatUtility::GetCustomAttributeConfig(host);
 	}
 
@@ -1052,7 +1052,7 @@ Value HostsTable::CustomVariableValuesAccessor(const Value& row)
 	if (!vars)
 		return cv;
 
-	ObjectLock olock(vars);
+	RLock olock(vars);
 	for (const Dictionary::Pair& kv : vars) {
 		if (kv.second.IsObjectType<Array>() || kv.second.IsObjectType<Dictionary>())
 			cv->Add(JsonEncode(kv.second));
@@ -1073,7 +1073,7 @@ Value HostsTable::CustomVariablesAccessor(const Value& row)
 	Dictionary::Ptr vars;
 
 	{
-		ObjectLock olock(host);
+		RLock olock(host);
 		vars = CompatUtility::GetCustomAttributeConfig(host);
 	}
 
@@ -1082,7 +1082,7 @@ Value HostsTable::CustomVariablesAccessor(const Value& row)
 	if (!vars)
 		return cv;
 
-	ObjectLock olock(vars);
+	RLock olock(vars);
 	for (const Dictionary::Pair& kv : vars) {
 		Array::Ptr key_val = new Array();
 		key_val->Add(kv.first);
@@ -1108,7 +1108,7 @@ Value HostsTable::CVIsJsonAccessor(const Value& row)
 	Dictionary::Ptr vars;
 
 	{
-		ObjectLock olock(host);
+		RLock olock(host);
 		vars = CompatUtility::GetCustomAttributeConfig(host);
 	}
 
@@ -1117,7 +1117,7 @@ Value HostsTable::CVIsJsonAccessor(const Value& row)
 
 	bool cv_is_json = false;
 
-	ObjectLock olock(vars);
+	RLock olock(vars);
 	for (const Dictionary::Pair& kv : vars) {
 		if (kv.second.IsObjectType<Array>() || kv.second.IsObjectType<Dictionary>())
 			cv_is_json = true;

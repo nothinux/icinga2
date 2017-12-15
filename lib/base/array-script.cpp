@@ -88,7 +88,6 @@ static Array::Ptr ArraySort(const std::vector<Value>& args)
 	Array::Ptr arr = self->ShallowClone();
 
 	if (args.empty()) {
-		ObjectLock olock(arr);
 		std::sort(arr->Begin(), arr->End());
 	} else {
 		Function::Ptr function = args[0];
@@ -96,7 +95,6 @@ static Array::Ptr ArraySort(const std::vector<Value>& args)
 		if (vframe->Sandboxed && !function->IsSideEffectFree())
 			BOOST_THROW_EXCEPTION(ScriptError("Sort function must be side-effect free."));
 
-		ObjectLock olock(arr);
 		std::sort(arr->Begin(), arr->End(), std::bind(ArraySortCmp, args[0], _1, _2));
 	}
 
@@ -118,7 +116,7 @@ static Value ArrayJoin(const Value& separator)
 	Value result;
 	bool first = true;
 
-	ObjectLock olock(self);
+	RLock olock(self);
 	for (const Value& item : self) {
 		if (first) {
 			first = false;
@@ -147,14 +145,17 @@ static Array::Ptr ArrayMap(const Function::Ptr& function)
 	if (vframe->Sandboxed && !function->IsSideEffectFree())
 		BOOST_THROW_EXCEPTION(ScriptError("Map function must be side-effect free."));
 
-	Array::Ptr result = new Array();
+	std::vector<Value> result;
 
-	ObjectLock olock(self);
-	for (const Value& item : self) {
-		result->Add(function->Invoke({ item }));
+	{
+		RLock olock(self);
+		result.reserve(self->GetLength());
+		for (const Value& item : self) {
+			result.emplace_back(function->Invoke({ item }));
+		}
 	}
 
-	return result;
+	return new Array(std::move(result));
 }
 
 static Value ArrayReduce(const Function::Ptr& function)
@@ -170,7 +171,7 @@ static Value ArrayReduce(const Function::Ptr& function)
 
 	Value result = self->Get(0);
 
-	ObjectLock olock(self);
+	RLock olock(self);
 	for (size_t i = 1; i < self->GetLength(); i++) {
 		result = function->Invoke({ result, self->Get(i) });
 	}
@@ -186,15 +187,18 @@ static Array::Ptr ArrayFilter(const Function::Ptr& function)
 	if (vframe->Sandboxed && !function->IsSideEffectFree())
 		BOOST_THROW_EXCEPTION(ScriptError("Filter function must be side-effect free."));
 
-	Array::Ptr result = new Array();
+	std::vector<Value> result;
 
-	ObjectLock olock(self);
-	for (const Value& item : self) {
-		if (function->Invoke({ item }))
-			result->Add(item);
+	{
+		RLock olock(self);
+		result.reserve(self->GetLength());
+		for (const Value& item : self) {
+			if (function->Invoke({ item }))
+				result.push_back(item);
+		}
 	}
 
-	return result;
+	return new Array(std::move(result));
 }
 
 static bool ArrayAny(const Function::Ptr& function)
@@ -205,7 +209,7 @@ static bool ArrayAny(const Function::Ptr& function)
 	if (vframe->Sandboxed && !function->IsSideEffectFree())
 		BOOST_THROW_EXCEPTION(ScriptError("Filter function must be side-effect free."));
 
-	ObjectLock olock(self);
+	RLock olock(self);
 	for (const Value& item : self) {
 		if (function->Invoke({ item }))
 			return true;
@@ -222,7 +226,7 @@ static bool ArrayAll(const Function::Ptr& function)
 	if (vframe->Sandboxed && !function->IsSideEffectFree())
 		BOOST_THROW_EXCEPTION(ScriptError("Filter function must be side-effect free."));
 
-	ObjectLock olock(self);
+	RLock olock(self);
 	for (const Value& item : self) {
 		if (!function->Invoke({ item }))
 			return false;
@@ -237,7 +241,7 @@ static Array::Ptr ArrayUnique()
 
 	std::set<Value> result;
 
-	ObjectLock olock(self);
+	RLock olock(self);
 	for (const Value& item : self) {
 		result.insert(item);
 	}

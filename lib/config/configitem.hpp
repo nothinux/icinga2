@@ -96,7 +96,7 @@ private:
 
 	ConfigObject::Ptr m_Object;
 
-	static boost::mutex m_Mutex;
+	static rw_spin_lock m_RWLock;
 
 	typedef std::map<String, ConfigItem::Ptr> ItemMap;
 	typedef std::map<Type::Ptr, ItemMap> TypeMap;

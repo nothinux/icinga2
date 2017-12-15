@@ -111,7 +111,7 @@ int IcingaApplication::Main()
 void IcingaApplication::OnShutdown()
 {
 	{
-		ObjectLock olock(this);
+		WLock olock(this);
 		l_RetentionTimer->Stop();
 	}
 

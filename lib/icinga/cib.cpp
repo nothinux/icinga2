@@ -82,7 +82,7 @@ CheckableCheckStatistics CIB::CalculateHostCheckStats()
 	bool checkresult = false;
 
 	for (const Host::Ptr& host : ConfigType::GetObjectsByType<Host>()) {
-		ObjectLock olock(host);
+		RLock olock(host);
 
 		CheckResult::Ptr cr = host->GetLastCheckResult();
 
@@ -143,7 +143,7 @@ CheckableCheckStatistics CIB::CalculateServiceCheckStats()
 	bool checkresult = false;
 
 	for (const Service::Ptr& service : ConfigType::GetObjectsByType<Service>()) {
-		ObjectLock olock(service);
+		RLock olock(service);
 
 		CheckResult::Ptr cr = service->GetLastCheckResult();
 
@@ -200,7 +200,7 @@ ServiceStatistics CIB::CalculateServiceStats()
 	ServiceStatistics ss = {};
 
 	for (const Service::Ptr& service : ConfigType::GetObjectsByType<Service>()) {
-		ObjectLock olock(service);
+		RLock olock(service);
 
 		CheckResult::Ptr cr = service->GetLastCheckResult();
 
@@ -234,7 +234,7 @@ HostStatistics CIB::CalculateHostStats()
 	HostStatistics hs = {};
 
 	for (const Host::Ptr& host : ConfigType::GetObjectsByType<Host>()) {
-		ObjectLock olock(host);
+		RLock olock(host);
 
 		if (host->IsReachable()) {
 			if (host->GetState() == HostUp)
@@ -270,7 +270,7 @@ std::pair<Dictionary::Ptr, Array::Ptr> CIB::GetFeatureStats()
 	Dictionary::Ptr statsFunctions = ScriptGlobal::Get("StatsFunctions", &Empty);
 
 	if (statsFunctions) {
-		ObjectLock olock(statsFunctions);
+		RLock olock(statsFunctions);
 
 		for (const Dictionary::Pair& kv : statsFunctions)
 			static_cast<Function::Ptr>(kv.second)->Invoke({ status, perfdata });

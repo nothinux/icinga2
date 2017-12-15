@@ -26,7 +26,6 @@
 #include "base/logger.hpp"
 #include "base/exception.hpp"
 #include <boost/lexical_cast.hpp>
-#include <boost/thread/recursive_mutex.hpp>
 
 using namespace icinga;
 
@@ -39,40 +38,12 @@ static Timer::Ptr l_ObjectCountTimer;
 #endif /* I2_LEAK_DEBUG */
 
 /**
- * Destructor for the Object class.
- */
-Object::~Object()
-{
-	delete reinterpret_cast<boost::recursive_mutex *>(m_Mutex);
-}
-
-/**
  * Returns a string representation for the object.
  */
 String Object::ToString() const
 {
 	return "Object of type '" + GetReflectionType()->GetName() + "'";
 }
-
-#ifdef I2_DEBUG
-/**
- * Checks if the calling thread owns the lock on this object.
- *
- * @returns True if the calling thread owns the lock, false otherwise.
- */
-bool Object::OwnsLock() const
-{
-#ifdef _WIN32
-	DWORD tid = InterlockedExchangeAdd(&m_LockOwner, 0);
-
-	return (tid == GetCurrentThreadId());
-#else /* _WIN32 */
-	pthread_t tid = __sync_fetch_and_add(&m_LockOwner, 0);
-
-	return (tid == pthread_self());
-#endif /* _WIN32 */
-}
-#endif /* I2_DEBUG */
 
 void Object::SetField(int id, const Value&, bool, const Value&)
 {
@@ -259,22 +230,12 @@ void icinga::intrusive_ptr_add_ref(Object *object)
 		TypeAddObject(object);
 #endif /* I2_LEAK_DEBUG */
 
-#ifdef _WIN32
-	InterlockedIncrement(&object->m_References);
-#else /* _WIN32 */
-	__sync_add_and_fetch(&object->m_References, 1);
-#endif /* _WIN32 */
+	object->m_References++;
 }
 
 void icinga::intrusive_ptr_release(Object *object)
 {
-	uintptr_t refs;
-
-#ifdef _WIN32
-	refs = InterlockedDecrement(&object->m_References);
-#else /* _WIN32 */
-	refs = __sync_sub_and_fetch(&object->m_References, 1);
-#endif /* _WIN32 */
+	uint32_t refs = --object->m_References;
 
 	if (unlikely(refs == 0)) {
 #ifdef I2_LEAK_DEBUG

@@ -50,7 +50,7 @@ public:
 	{
 		{
 			Dictionary::Ptr globals = ScriptGlobal::GetGlobals();
-			ObjectLock olock(globals);
+			RLock olock(globals);
 			for (const Dictionary::Pair& kv : globals) {
 				addTarget(GetTargetForVar(kv.first, kv.second));
 			}

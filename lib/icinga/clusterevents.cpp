@@ -140,7 +140,7 @@ Value ClusterEvents::CheckResultAPIHandler(const MessageOrigin::Ptr& origin, con
 	Array::Ptr rperf = new Array();
 
 	if (vperf) {
-		ObjectLock olock(vperf);
+		RLock olock(vperf);
 		for (const Value& vp : vperf) {
 			Value p;
 
@@ -986,7 +986,7 @@ Value ClusterEvents::NotificationSentToAllUsersAPIHandler(const MessageOrigin::P
 	std::set<User::Ptr> users;
 
 	{
-		ObjectLock olock(ausers);
+		RLock olock(ausers);
 		for (const String& auser : ausers) {
 			User::Ptr user = User::GetByName(auser);
 

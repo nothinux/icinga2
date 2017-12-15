@@ -289,10 +289,10 @@ Value icinga::operator-(const Value& lhs, const Value& rhs)
 		Array::Ptr left = lhs;
 		Array::Ptr right = rhs;
 
-		ObjectLock olock(left);
+		RLock olock(left);
 		for (const Value& lv : left) {
 			bool found = false;
-			ObjectLock xlock(right);
+			RLock xlock(right);
 			for (const Value& rv : right) {
 				if (lv == rv) {
 					found = true;
@@ -577,8 +577,8 @@ bool icinga::operator<(const Value& lhs, const Value& rhs)
 		Array::Ptr larr = lhs;
 		Array::Ptr rarr = rhs;
 
-		ObjectLock llock(larr);
-		ObjectLock rlock(rarr);
+		RLock llock(larr);
+		RLock rlock(rarr);
 
 		Array::SizeType llen = larr->GetLength();
 		Array::SizeType rlen = rarr->GetLength();
@@ -630,8 +630,8 @@ bool icinga::operator>(const Value& lhs, const Value& rhs)
 		Array::Ptr larr = lhs;
 		Array::Ptr rarr = rhs;
 
-		ObjectLock llock(larr);
-		ObjectLock rlock(rarr);
+		RLock llock(larr);
+		RLock rlock(rarr);
 
 		Array::SizeType llen = larr->GetLength();
 		Array::SizeType rlen = rarr->GetLength();

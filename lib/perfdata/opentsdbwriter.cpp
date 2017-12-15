@@ -167,7 +167,7 @@ void OpenTsdbWriter::SendPerfdata(const String& metric, const std::map<String, S
 	if (!perfdata)
 		return;
 
-	ObjectLock olock(perfdata);
+	RLock olock(perfdata);
 	for (const Value& val : perfdata) {
 		PerfdataValue::Ptr pdv;
 
@@ -221,7 +221,7 @@ void OpenTsdbWriter::SendMetric(const String& metric, const std::map<String, Str
 	msgbuf << "\n";
 	String put = msgbuf.str();
 
-	ObjectLock olock(this);
+	WLock olock(this);
 
 	if (!m_Stream)
 		return;

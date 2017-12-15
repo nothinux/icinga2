@@ -41,7 +41,7 @@ public:
 private:
 	DependencyGraph();
 
-	static boost::mutex m_Mutex;
+	static rw_spin_lock m_RWLock;
 	static std::map<Object *, std::map<Object *, int> > m_Dependencies;
 };
 

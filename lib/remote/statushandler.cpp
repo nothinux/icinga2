@@ -38,7 +38,7 @@ public:
 		Dictionary::Ptr statsFunctions = ScriptGlobal::Get("StatsFunctions", &Empty);
 
 		if (statsFunctions) {
-			ObjectLock olock(statsFunctions);
+			RLock olock(statsFunctions);
 
 			for (const Dictionary::Pair& kv : statsFunctions)
 				addTarget(GetTargetByName("Status", kv.first));

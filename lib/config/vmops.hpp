@@ -46,7 +46,7 @@ public:
 	{
 		Array::Ptr imports = ScriptFrame::GetImports();
 
-		ObjectLock olock(imports);
+		RLock olock(imports);
 		for (const Value& import : imports) {
 			Object::Ptr obj = import;
 			if (obj->HasOwnField(name)) {
@@ -213,7 +213,7 @@ public:
 			std::vector<String> keys;
 
 			{
-				ObjectLock olock(dict);
+				RLock olock(dict);
 				for (const Dictionary::Pair& kv : dict) {
 					keys.push_back(kv.first);
 				}

@@ -76,7 +76,7 @@ BOOST_AUTO_TEST_CASE(foreach)
 	dictionary->Set("test1", 7);
 	dictionary->Set("test2", "hello world");
 
-	ObjectLock olock(dictionary);
+	RLock olock(dictionary);
 
 	bool seen_test1 = false, seen_test2 = false;
 
@@ -131,7 +131,7 @@ BOOST_AUTO_TEST_CASE(remove)
 	dictionary->Set("test2", "hello world");
 
 	{
-		ObjectLock olock(dictionary);
+		WLock olock(dictionary);
 
 		auto it = dictionary->Begin();
 		dictionary->Remove(it);

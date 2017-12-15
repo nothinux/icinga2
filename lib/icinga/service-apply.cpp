@@ -108,7 +108,7 @@ bool Service::EvaluateApplyRule(const Host::Ptr& host, const ApplyRule& rule)
 
 		Array::Ptr arr = vinstances;
 
-		ObjectLock olock(arr);
+		RLock olock(arr);
 		for (const Value& instance : arr) {
 			String name = rule.GetName();
 

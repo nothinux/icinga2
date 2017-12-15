@@ -508,7 +508,7 @@ void ClassCompiler::HandleClass(const Klass& klass, const ClassDebugInfo&)
 
 		if (field.Type.ArrayRank > 0) {
 			m_Impl << "\t" << "if (avalue) {" << std::endl
-				<< "\t\t" << "ObjectLock olock(avalue);" << std::endl
+				<< "\t\t" << "RLock olock(avalue);" << std::endl
 				<< "\t\t" << "for (const Value& value : avalue) {" << std::endl;
 		}
 
@@ -882,7 +882,7 @@ void ClassCompiler::HandleClass(const Klass& klass, const ClassDebugInfo&)
 			if (field.Type.TypeName != "String") {
 				if (field.Type.ArrayRank > 0) {
 					m_Impl << "\t" << "if (oldValue) {" << std::endl
-						<< "\t\t" << "ObjectLock olock(oldValue);" << std::endl
+						<< "\t\t" << "RLock olock(oldValue);" << std::endl
 						<< "\t\t" << "for (const String& ref : oldValue) {" << std::endl
 						<< "\t\t\t" << "DependencyGraph::RemoveDependency(this, ConfigObject::GetObject";
 
@@ -896,7 +896,7 @@ void ClassCompiler::HandleClass(const Klass& klass, const ClassDebugInfo&)
 						<< "\t\t" << "}" << std::endl
 						<< "\t" << "}" << std::endl
 						<< "\t" << "if (newValue) {" << std::endl
-						<< "\t\t" << "ObjectLock olock(newValue);" << std::endl
+						<< "\t\t" << "RLock olock(newValue);" << std::endl
 						<< "\t\t" << "for (const String& ref : newValue) {" << std::endl
 						<< "\t\t\t" << "DependencyGraph::AddDependency(this, ConfigObject::GetObject";
 
@@ -1179,7 +1179,7 @@ void ClassCompiler::CodeGenValidator(const std::string& name, const std::string&
 						m_Impl << "\t\t" << "const Dictionary::Ptr& dict = value;" << std::endl;
 
 					m_Impl << (type_check ? "\t" : "") << "\t\t" << "{" << std::endl
-						<< (type_check ? "\t" : "") << "\t\t\t" << "ObjectLock olock(dict);" << std::endl
+						<< (type_check ? "\t" : "") << "\t\t\t" << "RLock olock(dict);" << std::endl
 						<< (type_check ? "\t" : "") << "\t\t\t" << "for (const Dictionary::Pair& kv : dict) {" << std::endl
 						<< (type_check ? "\t" : "") << "\t\t\t\t" << "const String& akey = kv.first;" << std::endl
 						<< (type_check ? "\t" : "") << "\t\t\t\t" << "const Value& avalue = kv.second;" << std::endl;
@@ -1192,7 +1192,7 @@ void ClassCompiler::CodeGenValidator(const std::string& name, const std::string&
 
 					m_Impl << (type_check ? "\t" : "") << "\t\t" << "Array::SizeType anum = 0;" << std::endl
 						<< (type_check ? "\t" : "") << "\t\t" << "{" << std::endl
-						<< (type_check ? "\t" : "") << "\t\t\t" << "ObjectLock olock(arr);" << std::endl
+						<< (type_check ? "\t" : "") << "\t\t\t" << "RLock olock(arr);" << std::endl
 						<< (type_check ? "\t" : "") << "\t\t\t" << "for (const Value& avalue : arr) {" << std::endl
 						<< (type_check ? "\t" : "") << "\t\t\t\t" << "String akey = Convert::ToString(anum);" << std::endl;
 					indent = true;

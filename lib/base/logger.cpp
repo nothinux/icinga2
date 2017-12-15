@@ -43,7 +43,7 @@ template Log& Log::operator<<(const double&);
 REGISTER_TYPE(Logger);
 
 std::set<Logger::Ptr> Logger::m_Loggers;
-boost::mutex Logger::m_Mutex;
+rw_spin_lock Logger::m_RWLock;
 bool Logger::m_ConsoleLogEnabled = true;
 bool Logger::m_TimestampEnabled = true;
 LogSeverity Logger::m_ConsoleLogSeverity = LogInformation;
@@ -63,24 +63,26 @@ void Logger::Start(bool runtimeCreated)
 {
 	ObjectImpl<Logger>::Start(runtimeCreated);
 
-	boost::mutex::scoped_lock lock(m_Mutex);
+	WLock lock(m_RWLock);
 	m_Loggers.insert(this);
 }
 
 void Logger::Stop(bool runtimeRemoved)
 {
 	{
-		boost::mutex::scoped_lock lock(m_Mutex);
+		WLock lock(m_RWLock);
 		m_Loggers.erase(this);
 	}
 
 	ObjectImpl<Logger>::Stop(runtimeRemoved);
 }
 
-std::set<Logger::Ptr> Logger::GetLoggers()
+void Logger::FlushAll(void)
 {
-	boost::mutex::scoped_lock lock(m_Mutex);
-	return m_Loggers;
+	RLock lock(m_RWLock);
+
+	for (const Logger::Ptr& logger : m_Loggers)
+		logger->Flush();
 }
 
 /**
@@ -225,14 +227,16 @@ Log::~Log()
 		}
 	}
 
-	for (const Logger::Ptr& logger : Logger::GetLoggers()) {
-		ObjectLock llock(logger);
+	{
+		RLock lock(Logger::m_RWLock);
 
-		if (!logger->IsActive())
-			continue;
+		for (const Logger::Ptr& logger : Logger::m_Loggers) {
+			if (!logger->IsActive())
+				continue;
 
-		if (entry.Severity >= logger->GetMinSeverity())
-			logger->ProcessLogEntry(entry);
+			if (entry.Severity >= logger->GetMinSeverity())
+				logger->ProcessLogEntry(entry);
+		}
 	}
 
 	if (Logger::IsConsoleLogEnabled() && entry.Severity >= Logger::GetConsoleLogSeverity())

@@ -886,7 +886,7 @@ bool IdoMysqlConnection::CanExecuteQuery(const DbQuery& query)
 		return false;
 
 	if (query.WhereCriteria) {
-		ObjectLock olock(query.WhereCriteria);
+		RLock olock(query.WhereCriteria);
 		Value value;
 
 		for (const Dictionary::Pair& kv : query.WhereCriteria) {
@@ -896,7 +896,7 @@ bool IdoMysqlConnection::CanExecuteQuery(const DbQuery& query)
 	}
 
 	if (query.Fields) {
-		ObjectLock olock(query.Fields);
+		RLock olock(query.Fields);
 
 		for (const Dictionary::Pair& kv : query.Fields) {
 			Value value;
@@ -978,7 +978,7 @@ void IdoMysqlConnection::InternalExecuteQuery(const DbQuery& query, int typeOver
 	if (query.WhereCriteria) {
 		where << " WHERE ";
 
-		ObjectLock olock(query.WhereCriteria);
+		RLock olock(query.WhereCriteria);
 		Value value;
 		bool first = true;
 
@@ -1053,7 +1053,7 @@ void IdoMysqlConnection::InternalExecuteQuery(const DbQuery& query, int typeOver
 		if (type == DbQueryUpdate && query.Fields->GetLength() == 0)
 			return;
 
-		ObjectLock olock(query.Fields);
+		RLock olock(query.Fields);
 
 		bool first = true;
 		for (const Dictionary::Pair& kv : query.Fields) {

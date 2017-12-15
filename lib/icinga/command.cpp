@@ -40,7 +40,7 @@ void Command::Validate(int types, const ValidationUtils& utils)
 		if (!GetCommandLine().IsObjectType<Array>())
 			BOOST_THROW_EXCEPTION(ValidationError(this, { "command" }, "Attribute 'command' must be an array if the 'arguments' attribute is set."));
 
-		ObjectLock olock(arguments);
+		RLock olock(arguments);
 		for (const Dictionary::Pair& kv : arguments) {
 			const Value& arginfo = kv.second;
 			Value argval;
@@ -71,7 +71,7 @@ void Command::Validate(int types, const ValidationUtils& utils)
 	Dictionary::Ptr env = GetEnv();
 
 	if (env) {
-		ObjectLock olock(env);
+		RLock olock(env);
 		for (const Dictionary::Pair& kv : env) {
 			const Value& envval = kv.second;
 

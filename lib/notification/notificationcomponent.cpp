@@ -102,7 +102,7 @@ void NotificationComponent::NotificationTimerHandler()
 		bool reachable = checkable->IsReachable(DependencyNotification);
 
 		{
-			ObjectLock olock(notification);
+			WLock olock(notification);
 			notification->SetNextNotification(Utility::GetTime() + notification->GetInterval());
 		}
 
@@ -111,7 +111,7 @@ void NotificationComponent::NotificationTimerHandler()
 			Service::Ptr service;
 			tie(host, service) = GetHostService(checkable);
 
-			ObjectLock olock(checkable);
+			RLock olock(checkable);
 
 			if (checkable->GetStateType() == StateTypeSoft)
 				continue;

@@ -48,7 +48,7 @@ bool InfoHandler::HandleRequest(const ApiUser::Ptr& user, HttpRequest& request, 
 	Array::Ptr permissions = user->GetPermissions();
 
 	if (permissions) {
-		ObjectLock olock(permissions);
+		RLock olock(permissions);
 		for (const Value& permission : permissions) {
 			String name;
 			bool hasFilter = false;

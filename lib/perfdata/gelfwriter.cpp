@@ -238,7 +238,7 @@ void GelfWriter::CheckResultHandlerInternal(const Checkable::Ptr& checkable, con
 		Array::Ptr perfdata = cr->GetPerformanceData();
 
 		if (perfdata) {
-			ObjectLock olock(perfdata);
+			RLock olock(perfdata);
 			for (const Value& val : perfdata) {
 				PerfdataValue::Ptr pdv;
 
@@ -414,7 +414,7 @@ void GelfWriter::SendLogMessage(const String& gelfMessage)
 
 	String log = msgbuf.str();
 
-	ObjectLock olock(this);
+	WLock olock(this);
 
 	if (!GetConnected())
 		return;
