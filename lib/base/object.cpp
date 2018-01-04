@@ -301,6 +301,7 @@ void icinga::intrusive_ptr_release(Object *object)
 
 		delete object;
 	}
+}
 
 void icinga::DefaultObjectFactoryCheckArgs(const std::vector<Value>& args)
 {
