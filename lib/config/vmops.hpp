@@ -46,8 +46,7 @@ public:
 	{
 		Array::Ptr imports = ScriptFrame::GetImports();
 
-		ObjectLock olock(imports);
-		for (const Value& import : imports) {
+		for (const Value& import : imports->GetView()) {
 			Object::Ptr obj = import;
 			if (obj->HasOwnField(name)) {
 				*result = import;

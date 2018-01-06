@@ -240,8 +240,7 @@ void GraphiteWriter::SendPerfdata(const String& prefix, const CheckResult::Ptr& 
 	if (!perfdata)
 		return;
 
-	ObjectLock olock(perfdata);
-	for (const Value& val : perfdata) {
+	for (const Value& val : perfdata->GetView()) {
 		PerfdataValue::Ptr pdv;
 
 		if (val.IsObjectType<PerfdataValue>())
@@ -332,8 +331,7 @@ Value GraphiteWriter::EscapeMacroMetric(const Value& value)
 		Array::Ptr arr = value;
 		Array::Ptr result = new Array();
 
-		ObjectLock olock(arr);
-		for (const Value& arg : arr) {
+		for (const Value& arg : arr->GetView()) {
 			result->Add(EscapeMetric(arg));
 		}
 

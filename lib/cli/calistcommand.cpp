@@ -24,6 +24,7 @@
 #include "base/application.hpp"
 #include "base/tlsutility.hpp"
 #include "base/json.hpp"
+#include "base/objectlock.hpp"
 #include <iostream>
 
 using namespace icinga;

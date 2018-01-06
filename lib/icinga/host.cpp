@@ -51,11 +51,7 @@ void Host::OnAllConfigLoaded()
 	Array::Ptr groups = GetGroups();
 
 	if (groups) {
-		groups = groups->ShallowClone();
-
-		ObjectLock olock(groups);
-
-		for (const String& name : groups) {
+		for (const String& name : groups->GetView()) {
 			HostGroup::Ptr hg = HostGroup::GetByName(name);
 
 			if (hg)
@@ -86,9 +82,7 @@ void Host::Stop(bool runtimeRemoved)
 	Array::Ptr groups = GetGroups();
 
 	if (groups) {
-		ObjectLock olock(groups);
-
-		for (const String& name : groups) {
+		for (const String& name : groups->GetView()) {
 			HostGroup::Ptr hg = HostGroup::GetByName(name);
 
 			if (hg)

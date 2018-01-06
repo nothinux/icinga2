@@ -48,8 +48,7 @@ bool InfoHandler::HandleRequest(const ApiUser::Ptr& user, HttpRequest& request, 
 	Array::Ptr permissions = user->GetPermissions();
 
 	if (permissions) {
-		ObjectLock olock(permissions);
-		for (const Value& permission : permissions) {
+		for (const Value& permission : permissions->GetView()) {
 			String name;
 			bool hasFilter = false;
 			if (permission.IsObjectType<Dictionary>()) {

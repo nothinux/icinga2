@@ -56,8 +56,7 @@ static void EncodeArray(yajl_gen handle, const Array::Ptr& arr)
 {
 	yajl_gen_array_open(handle);
 
-	ObjectLock olock(arr);
-	for (const Value& value : arr) {
+	for (const Value& value : arr->GetView()) {
 		Encode(handle, value);
 	}
 

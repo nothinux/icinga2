@@ -21,7 +21,6 @@
 #include "base/function.hpp"
 #include "base/functionwrapper.hpp"
 #include "base/scriptframe.hpp"
-#include "base/objectlock.hpp"
 #include "base/exception.hpp"
 
 using namespace icinga;
@@ -88,16 +87,16 @@ static Array::Ptr ArraySort(const std::vector<Value>& args)
 	Array::Ptr arr = self->ShallowClone();
 
 	if (args.empty()) {
-		ObjectLock olock(arr);
-		std::sort(arr->Begin(), arr->End());
+		//ObjectLock olock(arr);
+		//XXX: std::sort(arr->Begin(), arr->End());
 	} else {
 		Function::Ptr function = args[0];
 
 		if (vframe->Sandboxed && !function->IsSideEffectFree())
 			BOOST_THROW_EXCEPTION(ScriptError("Sort function must be side-effect free."));
 
-		ObjectLock olock(arr);
-		std::sort(arr->Begin(), arr->End(), std::bind(ArraySortCmp, args[0], _1, _2));
+		//ObjectLock olock(arr);
+		//XXX: std::sort(arr->Begin(), arr->End(), std::bind(ArraySortCmp, args[0], _1, _2));
 	}
 
 	return arr;
@@ -118,8 +117,7 @@ static Value ArrayJoin(const Value& separator)
 	Value result;
 	bool first = true;
 
-	ObjectLock olock(self);
-	for (const Value& item : self) {
+	for (const Value& item : self->GetView()) {
 		if (first) {
 			first = false;
 		} else {
@@ -149,8 +147,7 @@ static Array::Ptr ArrayMap(const Function::Ptr& function)
 
 	Array::Ptr result = new Array();
 
-	ObjectLock olock(self);
-	for (const Value& item : self) {
+	for (const Value& item : self->GetView()) {
 		result->Add(function->Invoke({ item }));
 	}
 
@@ -168,11 +165,13 @@ static Value ArrayReduce(const Function::Ptr& function)
 	if (self->GetLength() == 0)
 		return Empty;
 
-	Value result = self->Get(0);
 
-	ObjectLock olock(self);
-	for (size_t i = 1; i < self->GetLength(); i++) {
-		result = function->Invoke({ result, self->Get(i) });
+	auto data = self->GetView();
+
+	Value result = data->at(0);
+
+	for (size_t i = 1; i < data->size(); i++) {
+		result = function->Invoke({ result, data->at(i) });
 	}
 
 	return result;
@@ -188,8 +187,7 @@ static Array::Ptr ArrayFilter(const Function::Ptr& function)
 
 	Array::Ptr result = new Array();
 
-	ObjectLock olock(self);
-	for (const Value& item : self) {
+	for (const Value& item : self->GetView()) {
 		if (function->Invoke({ item }))
 			result->Add(item);
 	}
@@ -205,8 +203,7 @@ static bool ArrayAny(const Function::Ptr& function)
 	if (vframe->Sandboxed && !function->IsSideEffectFree())
 		BOOST_THROW_EXCEPTION(ScriptError("Filter function must be side-effect free."));
 
-	ObjectLock olock(self);
-	for (const Value& item : self) {
+	for (const Value& item : self->GetView()) {
 		if (function->Invoke({ item }))
 			return true;
 	}
@@ -222,8 +219,7 @@ static bool ArrayAll(const Function::Ptr& function)
 	if (vframe->Sandboxed && !function->IsSideEffectFree())
 		BOOST_THROW_EXCEPTION(ScriptError("Filter function must be side-effect free."));
 
-	ObjectLock olock(self);
-	for (const Value& item : self) {
+	for (const Value& item : self->GetView()) {
 		if (!function->Invoke({ item }))
 			return false;
 	}
@@ -237,8 +233,7 @@ static Array::Ptr ArrayUnique()
 
 	std::set<Value> result;
 
-	ObjectLock olock(self);
-	for (const Value& item : self) {
+	for (const Value& item : self->GetView()) {
 		result.insert(item);
 	}
 

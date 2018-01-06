@@ -181,13 +181,9 @@ void HttpServerConnection::ProcessMessageAsync(HttpRequest& request)
 	if (headerAllowOrigin->GetLength() != 0) {
 		String origin = request.Headers->Get("origin");
 
-		{
-			ObjectLock olock(headerAllowOrigin);
-
-			for (const String& allowedOrigin : headerAllowOrigin) {
-				if (allowedOrigin == origin)
-					response.AddHeader("Access-Control-Allow-Origin", origin);
-			}
+		for (const String& allowedOrigin : headerAllowOrigin->GetView()) {
+			if (allowedOrigin == origin)
+				response.AddHeader("Access-Control-Allow-Origin", origin);
 		}
 
 		if (listener->GetAccessControlAllowCredentials())

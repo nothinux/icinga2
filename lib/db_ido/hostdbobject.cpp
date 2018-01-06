@@ -194,8 +194,7 @@ void HostDbObject::OnConfigUpdateHeavy()
 	queries.emplace_back(std::move(query1));
 
 	if (groups) {
-		ObjectLock olock(groups);
-		for (const String& groupName : groups) {
+		for (const String& groupName : groups->GetView()) {
 			HostGroup::Ptr group = HostGroup::GetByName(groupName);
 
 			DbQuery query2;

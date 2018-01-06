@@ -238,8 +238,7 @@ void InfluxdbWriter::CheckResultHandlerWQ(const Checkable::Ptr& checkable, const
 
 	Array::Ptr perfdata = cr->GetPerformanceData();
 	if (perfdata) {
-		ObjectLock olock(perfdata);
-		for (const Value& val : perfdata) {
+		for (const Value& val : perfdata->GetView()) {
 			PerfdataValue::Ptr pdv;
 
 			if (val.IsObjectType<PerfdataValue>())

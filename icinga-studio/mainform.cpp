@@ -19,6 +19,7 @@
 
 #include "icinga-studio/mainform.hpp"
 #include "icinga-studio/aboutform.hpp"
+#include "base/objectlock.hpp"
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include <wx/msgdlg.h>
@@ -193,8 +194,7 @@ wxPGProperty *MainForm::ValueToProperty(const String& name, const Value& value)
 		Array::Ptr arr = value;
 
 		{
-			ObjectLock olock(arr);
-			for (const Value& aitem : arr) {
+			for (const Value& aitem : arr->GetView()) {
 				String val1 = aitem;
 				val.Add(val1.GetData());
 			}

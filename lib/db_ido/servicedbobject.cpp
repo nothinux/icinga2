@@ -188,8 +188,7 @@ void ServiceDbObject::OnConfigUpdateHeavy()
 	queries.emplace_back(std::move(query1));
 
 	if (groups) {
-		ObjectLock olock(groups);
-		for (const String& groupName : groups) {
+		for (const String& groupName : groups->GetView()) {
 			ServiceGroup::Ptr group = ServiceGroup::GetByName(groupName);
 
 			DbQuery query2;

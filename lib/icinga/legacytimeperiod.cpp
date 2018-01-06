@@ -426,8 +426,7 @@ Dictionary::Ptr LegacyTimePeriod::FindNextSegment(const String& daydef, const St
 				Dictionary::Ptr bestSegment;
 				double bestBegin;
 
-				ObjectLock olock(segments);
-				for (const Dictionary::Ptr& segment : segments) {
+				for (const Dictionary::Ptr& segment : segments->GetView()) {
 					double begin = segment->Get("begin");
 
 					if (begin < tsref)

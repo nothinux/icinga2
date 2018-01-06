@@ -200,10 +200,8 @@ String PluginUtility::FormatPerfdata(const Array::Ptr& perfdata)
 
 	std::ostringstream result;
 
-	ObjectLock olock(perfdata);
-
 	bool first = true;
-	for (const Value& pdv : perfdata) {
+	for (const Value& pdv : perfdata->GetView()) {
 		if (!first)
 			result << " ";
 		else

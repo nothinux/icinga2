@@ -89,11 +89,7 @@ BOOST_AUTO_TEST_CASE(remove)
 	array->Add(2);
 	array->Add(5);
 
-	{
-		ObjectLock olock(array);
-		auto it = array->Begin();
-		array->Remove(it);
-	}
+	array->Remove(0);
 
 	BOOST_CHECK(array->GetLength() == 2);
 	BOOST_CHECK(array->Get(0) == 2);
@@ -109,11 +105,9 @@ BOOST_AUTO_TEST_CASE(foreach)
 	array->Add(2);
 	array->Add(5);
 
-	ObjectLock olock(array);
-
 	int n = 0;
 
-	for (const Value& item : array) {
+	for (const Value& item : array->GetView()) {
 		BOOST_CHECK(n != 0 || item == 7);
 		BOOST_CHECK(n != 1 || item == 2);
 		BOOST_CHECK(n != 2 || item == 5);

@@ -41,8 +41,7 @@ String CompatUtility::GetCommandLine(const Command::Ptr& command)
 	if (commandLine.IsObjectType<Array>()) {
 		Array::Ptr args = commandLine;
 
-		ObjectLock olock(args);
-		for (const String& arg : args) {
+		for (const String& arg : args->GetView()) {
 			// This is obviously incorrect for non-trivial cases.
 			result += " \"" + EscapeString(arg) + "\"";
 		}

@@ -26,15 +26,17 @@ using namespace icinga;
 
 static Array::Ptr SerializeArray(const Array::Ptr& input, int attributeTypes)
 {
-	Array::Ptr result = new Array();
+	ArrayData result;
 
-	ObjectLock olock(input);
+	auto data = input->GetView();
 
-	for (const Value& value : input) {
-		result->Add(Serialize(value, attributeTypes));
+	result.reserve(data->size());
+
+	for (const Value& value : data) {
+		result.push_back(Serialize(value, attributeTypes));
 	}
 
-	return result;
+	return new Array(std::move(result));
 }
 
 static Dictionary::Ptr SerializeDictionary(const Dictionary::Ptr& input, int attributeTypes)
@@ -75,15 +77,17 @@ static Object::Ptr SerializeObject(const Object::Ptr& input, int attributeTypes)
 
 static Array::Ptr DeserializeArray(const Array::Ptr& input, bool safe_mode, int attributeTypes)
 {
-	Array::Ptr result = new Array();
+	ArrayData result;
 
-	ObjectLock olock(input);
+	auto data = input->GetView();
 
-	for (const Value& value : input) {
-		result->Add(Deserialize(value, safe_mode, attributeTypes));
+	result.reserve(data->size());
+
+	for (const Value& value : data) {
+		result.emplace_back(Deserialize(value, safe_mode, attributeTypes));
 	}
 
-	return result;
+	return new Array(std::move(result));
 }
 
 static Dictionary::Ptr DeserializeDictionary(const Dictionary::Ptr& input, bool safe_mode, int attributeTypes)
