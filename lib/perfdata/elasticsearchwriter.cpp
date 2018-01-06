@@ -132,8 +132,7 @@ void ElasticsearchWriter::AddCheckResult(const Dictionary::Ptr& fields, const Ch
 	Array::Ptr perfdata = cr->GetPerformanceData();
 
 	if (perfdata) {
-		ObjectLock olock(perfdata);
-		for (const Value& val : perfdata) {
+		for (const Value& val : perfdata->GetView()) {
 			PerfdataValue::Ptr pdv;
 
 			if (val.IsObjectType<PerfdataValue>())

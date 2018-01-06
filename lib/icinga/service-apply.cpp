@@ -106,8 +106,7 @@ bool Service::EvaluateApplyRule(const Host::Ptr& host, const ApplyRule& rule)
 
 		Array::Ptr arr = vinstances;
 
-		ObjectLock olock(arr);
-		for (const Value& instance : arr) {
+		for (const Value& instance : arr->GetView()) {
 			String name = rule.GetName();
 
 			if (!rule.GetFKVar().IsEmpty()) {

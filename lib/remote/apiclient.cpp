@@ -23,6 +23,7 @@
 #include "base/logger.hpp"
 #include "base/exception.hpp"
 #include "base/convert.hpp"
+#include "base/objectlock.hpp"
 
 using namespace icinga;
 
@@ -78,9 +79,7 @@ void ApiClient::TypesHttpCompletionCallback(HttpRequest& request, HttpResponse& 
 
 		Array::Ptr results = result->Get("results");
 
-		ObjectLock olock(results);
-		for (const Dictionary::Ptr typeInfo : results)
-		{
+		for (const Dictionary::Ptr typeInfo : results->GetView()) {
 			ApiType::Ptr type = new ApiType();;
 			type->Abstract = typeInfo->Get("abstract");
 			type->BaseName = typeInfo->Get("base");
@@ -164,8 +163,7 @@ void ApiClient::ObjectsHttpCompletionCallback(HttpRequest& request,
 		Array::Ptr results = result->Get("results");
 
 		if (results) {
-			ObjectLock olock(results);
-			for (const Dictionary::Ptr objectInfo : results) {
+			for (const Dictionary::Ptr objectInfo : results->GetView()) {
 				ApiObject::Ptr object = new ApiObject();
 
 				object->Name = objectInfo->Get("name");
@@ -199,8 +197,7 @@ void ApiClient::ObjectsHttpCompletionCallback(HttpRequest& request,
 				Array::Ptr used_by = objectInfo->Get("used_by");
 
 				if (used_by) {
-					ObjectLock olock(used_by);
-					for (const Dictionary::Ptr& refInfo : used_by) {
+					for (const Dictionary::Ptr& refInfo : used_by->GetView()) {
 						ApiObjectReference ref;
 						ref.Name = refInfo->Get("name");
 						ref.Type = refInfo->Get("type");

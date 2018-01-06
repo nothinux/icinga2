@@ -51,9 +51,7 @@ Value MacroProcessor::ResolveMacros(const Value& str, const ResolverList& resolv
 		ArrayData resultArr;;
 		Array::Ptr arr = str;
 
-		ObjectLock olock(arr);
-
-		for (const Value& arg : arr) {
+		for (const Value& arg : arr->GetView()) {
 			/* Note: don't escape macros here. */
 			Value value = InternalResolveMacros(arg, resolvers, cr, missingMacro,
 				EscapeCallback(), resolvedMacros, useResolvedMacros, recursionLevel + 1);
@@ -277,8 +275,7 @@ Value MacroProcessor::InternalResolveMacros(const String& str, const ResolverLis
 				Array::Ptr arr = resolved_macro;
 				ArrayData resolved_arr;
 
-				ObjectLock olock(arr);
-				for (const Value& value : arr) {
+				for (const Value& value : arr->GetView()) {
 					if (value.IsScalar()) {
 						resolved_arr.push_back(InternalResolveMacros(value,
 							resolvers, cr, missingMacro, EscapeCallback(), nullptr,
@@ -371,8 +368,7 @@ void MacroProcessor::ValidateCustomVars(const ConfigObject::Ptr& object, const D
 			/* check all array entries */
 			Array::Ptr varval_arr = varval;
 
-			ObjectLock ylock (varval_arr);
-			for (const Value& arrval : varval_arr) {
+			for (const Value& arrval : varval_arr->GetView()) {
 				if (!arrval.IsString())
 					continue;
 
@@ -407,8 +403,7 @@ Value MacroProcessor::EscapeMacroShellArg(const Value& value)
 	if (value.IsObjectType<Array>()) {
 		Array::Ptr arr = value;
 
-		ObjectLock olock(arr);
-		for (const Value& arg : arr) {
+		for (const Value& arg : arr->GetView()) {
 			if (result.GetLength() > 0)
 				result += " ";
 
@@ -541,8 +536,7 @@ Value MacroProcessor::ResolveArguments(const Value& command, const Dictionary::P
 				bool first = true;
 				Array::Ptr arr = static_cast<Array::Ptr>(arg.AValue);
 
-				ObjectLock olock(arr);
-				for (const Value& value : arr) {
+				for (const Value& value : arr->GetView()) {
 					bool add_key;
 
 					if (first) {

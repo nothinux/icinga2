@@ -38,8 +38,7 @@ Dictionary::Ptr ObjectQueryHandler::SerializeObjectAttrs(const Object::Ptr& obje
 	std::vector<int> fids;
 
 	if (isJoin && attrs) {
-		ObjectLock olock(attrs);
-		for (const String& attr : attrs) {
+		for (const String& attr : attrs->GetView()) {
 			if (attr == attrPrefix) {
 				allAttrs = true;
 				break;
@@ -55,8 +54,7 @@ Dictionary::Ptr ObjectQueryHandler::SerializeObjectAttrs(const Object::Ptr& obje
 			fids.push_back(fid);
 		}
 	} else if (attrs) {
-		ObjectLock olock(attrs);
-		for (const String& attr : attrs) {
+		for (const String& attr : attrs->GetView()) {
 			String userAttr;
 
 			if (isJoin) {
@@ -177,8 +175,7 @@ bool ObjectQueryHandler::HandleRequest(const ApiUser::Ptr& user, HttpRequest& re
 	std::set<String> userJoinAttrs;
 
 	if (ujoins) {
-		ObjectLock olock(ujoins);
-		for (const String& ujoin : ujoins) {
+		for (const String& ujoin : ujoins->GetView()) {
 			userJoinAttrs.insert(ujoin.SubStr(0, ujoin.FindFirstOf(".")));
 		}
 	}
@@ -204,8 +201,7 @@ bool ObjectQueryHandler::HandleRequest(const ApiUser::Ptr& user, HttpRequest& re
 		DictionaryData metaAttrs;
 
 		if (umetas) {
-			ObjectLock olock(umetas);
-			for (const String& meta : umetas) {
+			for (const String& meta : umetas->GetView()) {
 				if (meta == "used_by") {
 					Array::Ptr used_by = new Array();
 					metaAttrs.emplace_back("used_by", used_by);

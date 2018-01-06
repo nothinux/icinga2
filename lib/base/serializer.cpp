@@ -28,11 +28,11 @@ static Array::Ptr SerializeArray(const Array::Ptr& input, int attributeTypes)
 {
 	ArrayData result;
 
-	result.reserve(input->GetLength());
+	auto data = input->GetView();
 
-	ObjectLock olock(input);
+	result.reserve(data->size());
 
-	for (const Value& value : input) {
+	for (const Value& value : data) {
 		result.emplace_back(Serialize(value, attributeTypes));
 	}
 
@@ -85,11 +85,11 @@ static Array::Ptr DeserializeArray(const Array::Ptr& input, bool safe_mode, int 
 {
 	ArrayData result;
 
-	result.reserve(input->GetLength());
+	auto data = input->GetView();
 
-	ObjectLock olock(input);
+	result.reserve(data->size());
 
-	for (const Value& value : input) {
+	for (const Value& value : data) {
 		result.emplace_back(Deserialize(value, safe_mode, attributeTypes));
 	}
 

@@ -50,11 +50,8 @@ bool EventsHandler::HandleRequest(const ApiUser::Ptr& user, HttpRequest& request
 		return true;
 	}
 
-	{
-		ObjectLock olock(types);
-		for (const String& type : types) {
-			FilterUtility::CheckPermission(user, "events/" + type);
-		}
+	for (const String& type : types->GetView()) {
+		FilterUtility::CheckPermission(user, "events/" + type);
 	}
 
 	String queueName = HttpUtility::GetLastParameter(params, "queue");

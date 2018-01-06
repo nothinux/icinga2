@@ -79,8 +79,7 @@ void TimePeriodDbObject::OnConfigUpdateHeavy()
 		Array::Ptr segments = new Array();
 		LegacyTimePeriod::ProcessTimeRanges(kv.second, &reference, segments);
 
-		ObjectLock olock(segments);
-		for (const Value& vsegment : segments) {
+		for (const Value& vsegment : segments->GetView()) {
 			Dictionary::Ptr segment = vsegment;
 			int begin = segment->Get("begin");
 			int end = segment->Get("end");

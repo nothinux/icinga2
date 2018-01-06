@@ -118,8 +118,7 @@ bool Notification::EvaluateApplyRule(const Checkable::Ptr& checkable, const Appl
 
 		Array::Ptr arr = vinstances;
 
-		ObjectLock olock(arr);
-		for (const Value& instance : arr) {
+		for (const Value& instance : arr->GetView()) {
 			String name = rule.GetName();
 
 			if (!rule.GetFKVar().IsEmpty()) {

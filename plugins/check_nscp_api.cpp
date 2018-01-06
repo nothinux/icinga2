@@ -165,9 +165,8 @@ static int FormatOutput(const Dictionary::Ptr& result)
 	}
 
 	std::stringstream ssout;
-	ObjectLock olock(lines);
 
-	for (const Value& vline : lines) {
+	for (const Value& vline : lines->GetView()) {
 		Dictionary::Ptr line;
 		try {
 			line = vline;
@@ -188,9 +187,8 @@ static int FormatOutput(const Dictionary::Ptr& result)
 		}
 
 		Array::Ptr perfs = line->Get("perf");
-		ObjectLock olock(perfs);
 
-		for (const Dictionary::Ptr& perf : perfs) {
+		for (const Dictionary::Ptr& perf : perfs->GetView()) {
 			ssout << "'" << perf->Get("alias") << "'=";
 			Dictionary::Ptr values = perf->Contains("int_value") ? perf->Get("int_value") : perf->Get("float_value");
 			ssout << values->Get("value") << values->Get("unit") << ';' << values->Get("warning") << ';' << values->Get("critical");

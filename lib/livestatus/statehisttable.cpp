@@ -268,7 +268,7 @@ void StateHistTable::FetchRows(const AddRowFunction& addRowFn)
 	Checkable::Ptr checkable;
 
 	for (const auto& kv : m_CheckablesCache) {
-		for (const Dictionary::Ptr& state_hist_bag : kv.second) {
+		for (const Dictionary::Ptr& state_hist_bag : kv.second->GetView()) {
 			/* pass a dictionary from state history array */
 			if (!addRowFn(state_hist_bag, LivestatusGroupByNone, Empty))
 				return;

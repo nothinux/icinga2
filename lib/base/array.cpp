@@ -18,7 +18,6 @@
  ******************************************************************************/
 
 #include "base/array.hpp"
-#include "base/objectlock.hpp"
 #include "base/debug.hpp"
 #include "base/primitivetype.hpp"
 #include "base/dictionary.hpp"
@@ -32,16 +31,22 @@ template class std::vector<Value>;
 
 REGISTER_PRIMITIVE_TYPE(Array, Object, Array::GetPrototype());
 
-Array::Array(const ArrayData& other)
-	: m_Data(other)
+static boost::shared_ptr<ArrayData> EmptyArrayData = boost::make_shared<ArrayData>();
+
+Array::Array()
+	: m_Data(EmptyArrayData)
 { }
 
-Array::Array(ArrayData&& other)
-	: m_Data(std::move(other))
+Array::Array(const ArrayData& data)
+	: m_Data(boost::make_shared<ArrayData>(data))
+{ }
+
+Array::Array(ArrayData&& data)
+	: m_Data(boost::make_shared<ArrayData>(std::move(data)))
 { }
 
 Array::Array(std::initializer_list<Value> init)
-	: m_Data(init)
+	: m_Data(boost::make_shared<ArrayData>(init))
 { }
 
 /**
@@ -52,9 +57,8 @@ Array::Array(std::initializer_list<Value> init)
  */
 Value Array::Get(SizeType index) const
 {
-	ObjectLock olock(this);
-
-	return m_Data.at(index);
+	auto data = GetView();
+	return data->at(index);
 }
 
 /**
@@ -65,9 +69,9 @@ Value Array::Get(SizeType index) const
  */
 void Array::Set(SizeType index, const Value& value)
 {
-	ObjectLock olock(this);
-
-	m_Data.at(index) = value;
+	m_Data.copy_update([index, &value](ArrayData *data) {
+		data->at(index) = value;
+	});
 }
 
 /**
@@ -78,9 +82,9 @@ void Array::Set(SizeType index, const Value& value)
  */
 void Array::Set(SizeType index, Value&& value)
 {
-	ObjectLock olock(this);
-
-	m_Data.at(index).Swap(value);
+	m_Data.copy_update([index, &value](ArrayData *data) {
+		data->at(index).Swap(value);
+	});
 }
 
 /**
@@ -90,37 +94,14 @@ void Array::Set(SizeType index, Value&& value)
  */
 void Array::Add(Value value)
 {
-	ObjectLock olock(this);
-
-	m_Data.push_back(std::move(value));
+	m_Data.copy_update([&value](ArrayData *data) {
+		data->push_back(value);
+	});
 }
 
-/**
- * Returns an iterator to the beginning of the array.
- *
- * Note: Caller must hold the object lock while using the iterator.
- *
- * @returns An iterator.
- */
-Array::Iterator Array::Begin()
+ArrayView Array::GetView() const
 {
-	ASSERT(OwnsLock());
-
-	return m_Data.begin();
-}
-
-/**
- * Returns an iterator to the end of the array.
- *
- * Note: Caller must hold the object lock while using the iterator.
- *
- * @returns An iterator.
- */
-Array::Iterator Array::End()
-{
-	ASSERT(OwnsLock());
-
-	return m_Data.end();
+	return m_Data.read();
 }
 
 /**
@@ -130,9 +111,8 @@ Array::Iterator Array::End()
  */
 size_t Array::GetLength() const
 {
-	ObjectLock olock(this);
-
-	return m_Data.size();
+	auto data = GetView();
+	return data->size();
 }
 
 /**
@@ -143,9 +123,8 @@ size_t Array::GetLength() const
  */
 bool Array::Contains(const Value& value) const
 {
-	ObjectLock olock(this);
-
-	return (std::find(m_Data.begin(), m_Data.end(), value) != m_Data.end());
+	auto data = GetView();
+	return (std::find(data->begin(), data->end(), value) != data->end());
 }
 
 /**
@@ -156,11 +135,11 @@ bool Array::Contains(const Value& value) const
  */
 void Array::Insert(SizeType index, Value value)
 {
-	ObjectLock olock(this);
+	m_Data.copy_update([index, &value](ArrayData *data) {
+		ASSERT(index <= data->size());
 
-	ASSERT(index <= m_Data.size());
-
-	m_Data.insert(m_Data.begin() + index, std::move(value));
+		data->insert(data->begin() + index, value);
+	});
 }
 
 /**
@@ -170,50 +149,37 @@ void Array::Insert(SizeType index, Value value)
  */
 void Array::Remove(SizeType index)
 {
-	ObjectLock olock(this);
-
-	m_Data.erase(m_Data.begin() + index);
-}
-
-/**
- * Removes the item specified by the iterator from the array.
- *
- * @param it The iterator.
- */
-void Array::Remove(Array::Iterator it)
-{
-	ASSERT(OwnsLock());
-
-	m_Data.erase(it);
+	m_Data.copy_update([index](ArrayData *data) {
+		data->erase(data->begin() + index);
+	});
 }
 
 void Array::Resize(SizeType newSize)
 {
-	ObjectLock olock(this);
-
-	m_Data.resize(newSize);
+	m_Data.copy_update([newSize](ArrayData *data) {
+		data->resize(newSize);
+	});
 }
 
 void Array::Clear()
 {
-	ObjectLock olock(this);
-
-	m_Data.clear();
+	m_Data = boost::make_shared<ArrayData>();
 }
 
 void Array::Reserve(SizeType newSize)
 {
-	ObjectLock olock(this);
-
-	m_Data.reserve(newSize);
+	m_Data.copy_update([newSize](ArrayData *data) {
+		data->reserve(newSize);
+	});
 }
 
 void Array::CopyTo(const Array::Ptr& dest) const
 {
-	ObjectLock olock(this);
-	ObjectLock xlock(dest);
+	auto ourData = GetView();
 
-	std::copy(m_Data.begin(), m_Data.end(), std::back_inserter(dest->m_Data));
+	dest->m_Data.copy_update([&ourData](ArrayData *data) {
+		std::copy(ourData->begin(), ourData->end(), std::back_inserter(*data));
+	});
 }
 
 /**
@@ -223,9 +189,7 @@ void Array::CopyTo(const Array::Ptr& dest) const
  */
 Array::Ptr Array::ShallowClone() const
 {
-	Array::Ptr clone = new Array();
-	CopyTo(clone);
-	return clone;
+	return new Array(*GetView());
 }
 
 /**
@@ -236,32 +200,33 @@ Array::Ptr Array::ShallowClone() const
  */
 Object::Ptr Array::Clone() const
 {
-	ArrayData arr;
+	ArrayData result;
 
-	ObjectLock olock(this);
-	for (const Value& val : m_Data) {
-		arr.push_back(val.Clone());
+	for (const Value& val : GetView()) {
+		result.push_back(val.Clone());
 	}
 
-	return new Array(std::move(arr));
+	return new Array(std::move(result));
 }
 
 Array::Ptr Array::Reverse() const
 {
 	Array::Ptr result = new Array();
 
-	ObjectLock olock(this);
-	ObjectLock xlock(result);
+	auto ourData = GetView();
 
-	std::copy(m_Data.rbegin(), m_Data.rend(), std::back_inserter(result->m_Data));
+	result->m_Data.copy_update([&ourData](ArrayData *data) {
+		std::copy(ourData->rbegin(), ourData->rend(), std::back_inserter(*data));
+	});
 
 	return result;
 }
 
 void Array::Sort()
 {
-	ObjectLock olock(this);
-	std::sort(m_Data.begin(), m_Data.end());
+	m_Data.copy_update([](ArrayData *data) {
+		std::sort(data->begin(), data->end());
+	});
 }
 
 String Array::ToString() const
@@ -281,35 +246,35 @@ Value Array::GetFieldByName(const String& field, bool sandboxed, const DebugInfo
 		return Object::GetFieldByName(field, sandboxed, debugInfo);
 	}
 
-	ObjectLock olock(this);
+	auto data = GetView();
 
-	if (index < 0 || static_cast<size_t>(index) >= GetLength())
+	if (index < 0 || static_cast<size_t>(index) >= data->size())
 		BOOST_THROW_EXCEPTION(ScriptError("Array index '" + Convert::ToString(index) + "' is out of bounds.", debugInfo));
 
-	return Get(index);
+	return data->at(index);
 }
 
 void Array::SetFieldByName(const String& field, const Value& value, const DebugInfo& debugInfo)
 {
-	ObjectLock olock(this);
-
 	int index = Convert::ToLong(field);
 
 	if (index < 0)
 		BOOST_THROW_EXCEPTION(ScriptError("Array index '" + Convert::ToString(index) + "' is out of bounds.", debugInfo));
 
-	if (static_cast<size_t>(index) >= GetLength())
-		Resize(index + 1);
+	m_Data.copy_update([index, &value](ArrayData *data) {
+		if (static_cast<size_t>(index) >= data->size())
+			data->resize(index + 1);
 
-	Set(index, value);
+		data->at(index) = value;
+	});
 }
 
-Array::Iterator icinga::begin(const Array::Ptr& x)
+Array::ConstIterator icinga::begin(const ArrayView& x)
 {
-	return x->Begin();
+	return x->begin();
 }
 
-Array::Iterator icinga::end(const Array::Ptr& x)
+Array::ConstIterator icinga::end(const ArrayView& x)
 {
-	return x->End();
+	return x->end();
 }

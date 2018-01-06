@@ -283,8 +283,7 @@ std::vector<String> ConsoleHandler::GetAutocompletionSuggestions(const String& w
 
 	{
 		Array::Ptr imports = ScriptFrame::GetImports();
-		ObjectLock olock(imports);
-		for (const Value& import : imports) {
+		for (const Value& import : imports->GetView()) {
 			AddSuggestions(matches, word, "", false, import);
 		}
 	}

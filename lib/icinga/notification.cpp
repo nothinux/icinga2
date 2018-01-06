@@ -182,9 +182,7 @@ std::set<User::Ptr> Notification::GetUsers() const
 	Array::Ptr users = GetUsersRaw();
 
 	if (users) {
-		ObjectLock olock(users);
-
-		for (const String& name : users) {
+		for (const String& name : users->GetView()) {
 			User::Ptr user = User::GetByName(name);
 
 			if (!user)
@@ -204,9 +202,7 @@ std::set<UserGroup::Ptr> Notification::GetUserGroups() const
 	Array::Ptr groups = GetUserGroupsRaw();
 
 	if (groups) {
-		ObjectLock olock(groups);
-
-		for (const String& name : groups) {
+		for (const String& name : groups->GetView()) {
 			UserGroup::Ptr ug = UserGroup::GetByName(name);
 
 			if (!ug)

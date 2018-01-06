@@ -237,8 +237,7 @@ void GelfWriter::CheckResultHandlerInternal(const Checkable::Ptr& checkable, con
 		Array::Ptr perfdata = cr->GetPerformanceData();
 
 		if (perfdata) {
-			ObjectLock olock(perfdata);
-			for (const Value& val : perfdata) {
+			for (const Value& val : perfdata->GetView()) {
 				PerfdataValue::Ptr pdv;
 
 				if (val.IsObjectType<PerfdataValue>())

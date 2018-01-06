@@ -564,8 +564,7 @@ Process::Arguments Process::PrepareCommand(const Value& command)
 	if (command.IsObjectType<Array>()) {
 		Array::Ptr arguments = command;
 
-		ObjectLock olock(arguments);
-		for (const Value& argument : arguments) {
+		for (const Value& argument : arguments->GetView()) {
 #ifdef _WIN32
 			if (args != "")
 				args += " ";

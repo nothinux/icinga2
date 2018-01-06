@@ -46,11 +46,7 @@ void User::OnAllConfigLoaded()
 	Array::Ptr groups = GetGroups();
 
 	if (groups) {
-		groups = groups->ShallowClone();
-
-		ObjectLock olock(groups);
-
-		for (const String& name : groups) {
+		for (const String& name : groups->GetView()) {
 			UserGroup::Ptr ug = UserGroup::GetByName(name);
 
 			if (ug)
@@ -66,9 +62,7 @@ void User::Stop(bool runtimeRemoved)
 	Array::Ptr groups = GetGroups();
 
 	if (groups) {
-		ObjectLock olock(groups);
-
-		for (const String& name : groups) {
+		for (const String& name : groups->GetView()) {
 			UserGroup::Ptr ug = UserGroup::GetByName(name);
 
 			if (ug)

@@ -204,8 +204,8 @@ char *ConsoleCommand::ConsoleCompleteHelper(const char *word, int state)
 
 			matches.clear();
 
-			ObjectLock olock(suggestions);
-			std::copy(suggestions->Begin(), suggestions->End(), std::back_inserter(matches));
+			auto data = suggestions->GetView();
+			std::copy(data->begin(), data->end(), std::back_inserter(matches));
 		}
 	}
 

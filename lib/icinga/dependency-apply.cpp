@@ -119,8 +119,7 @@ bool Dependency::EvaluateApplyRule(const Checkable::Ptr& checkable, const ApplyR
 
 		Array::Ptr arr = vinstances;
 
-		ObjectLock olock(arr);
-		for (const Value& instance : arr) {
+		for (const Value& instance : arr->GetView()) {
 			String name = rule.GetName();
 
 			if (!rule.GetFKVar().IsEmpty()) {

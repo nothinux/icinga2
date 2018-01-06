@@ -306,9 +306,7 @@ void StatusDataWriter::DumpHostObject(std::ostream& fp, const Host::Ptr& host)
 	Array::Ptr groups = host->GetGroups();
 
 	if (groups) {
-		ObjectLock olock(groups);
-
-		for (const String& name : groups) {
+		for (const String& name : groups->GetView()) {
 			HostGroup::Ptr hg = HostGroup::GetByName(name);
 
 			if (hg) {
@@ -500,9 +498,7 @@ void StatusDataWriter::DumpServiceObject(std::ostream& fp, const Service::Ptr& s
 	Array::Ptr groups = service->GetGroups();
 
 	if (groups) {
-		ObjectLock olock(groups);
-
-		for (const String& name : groups) {
+		for (const String& name : groups->GetView()) {
 			ServiceGroup::Ptr sg = ServiceGroup::GetByName(name);
 
 			if (sg) {

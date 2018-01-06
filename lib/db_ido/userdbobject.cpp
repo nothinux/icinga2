@@ -95,8 +95,7 @@ void UserDbObject::OnConfigUpdateHeavy()
 	queries.emplace_back(std::move(query1));
 
 	if (groups) {
-		ObjectLock olock(groups);
-		for (const String& groupName : groups) {
+		for (const String& groupName : groups->GetView()) {
 			UserGroup::Ptr group = UserGroup::GetByName(groupName);
 
 			DbQuery query2;

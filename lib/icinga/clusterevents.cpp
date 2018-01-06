@@ -140,8 +140,7 @@ Value ClusterEvents::CheckResultAPIHandler(const MessageOrigin::Ptr& origin, con
 	ArrayData rperf;
 
 	if (vperf) {
-		ObjectLock olock(vperf);
-		for (const Value& vp : vperf) {
+		for (const Value& vp : vperf->GetView()) {
 			Value p;
 
 			if (vp.IsObjectType<Dictionary>()) {
@@ -986,8 +985,7 @@ Value ClusterEvents::NotificationSentToAllUsersAPIHandler(const MessageOrigin::P
 	std::set<User::Ptr> users;
 
 	{
-		ObjectLock olock(ausers);
-		for (const String& auser : ausers) {
+		for (const String& auser : ausers->GetView()) {
 			User::Ptr user = User::GetByName(auser);
 
 			if (!user)

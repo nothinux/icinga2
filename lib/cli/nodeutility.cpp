@@ -191,8 +191,7 @@ bool NodeUtility::WriteNodeConfigObjects(const String& filename, const Array::Pt
 	fp << " * on " << Utility::FormatDateTime("%Y-%m-%d %H:%M:%S %z", Utility::GetTime()) << "\n";
 	fp << " */\n\n";
 
-	ObjectLock olock(objects);
-	for (const Dictionary::Ptr& object : objects) {
+	for (const Dictionary::Ptr& object : objects->GetView()) {
 		SerializeObject(fp, object);
 	}
 

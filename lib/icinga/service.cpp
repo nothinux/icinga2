@@ -79,11 +79,7 @@ void Service::OnAllConfigLoaded()
 	Array::Ptr groups = GetGroups();
 
 	if (groups) {
-		groups = groups->ShallowClone();
-
-		ObjectLock olock(groups);
-
-		for (const String& name : groups) {
+		for (const String& name : groups->GetView()) {
 			ServiceGroup::Ptr sg = ServiceGroup::GetByName(name);
 
 			if (sg)

@@ -42,14 +42,9 @@ static Value FunctionCallV(const Value& thisArg, const Array::Ptr& args)
 	ScriptFrame *vframe = ScriptFrame::GetCurrentFrame();
 	Function::Ptr self = static_cast<Function::Ptr>(vframe->Self);
 
-	std::vector<Value> uargs;
+	auto uargs = args->GetView();
 
-	{
-		ObjectLock olock(args);
-		uargs = std::vector<Value>(args->Begin(), args->End());
-	}
-
-	return self->InvokeThis(thisArg, uargs);
+	return self->InvokeThis(thisArg, *uargs);
 }
 
 

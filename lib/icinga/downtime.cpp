@@ -260,8 +260,7 @@ String Downtime::AddDowntime(const Checkable::Ptr& checkable, const String& auth
 	Array::Ptr errors = new Array();
 
 	if (!ConfigObjectUtility::CreateObject(Downtime::TypeInstance, fullName, config, errors)) {
-		ObjectLock olock(errors);
-		for (const String& error : errors) {
+		for (const String& error : errors->GetView()) {
 			Log(LogCritical, "Downtime", error);
 		}
 
@@ -272,6 +271,7 @@ String Downtime::AddDowntime(const Checkable::Ptr& checkable, const String& auth
 		Downtime::Ptr parentDowntime = Downtime::GetByName(triggeredBy);
 		Array::Ptr triggers = parentDowntime->GetTriggers();
 
+		//XXX:rcu
 		ObjectLock olock(triggers);
 		if (!triggers->Contains(fullName))
 			triggers->Add(fullName);
@@ -313,8 +313,7 @@ void Downtime::RemoveDowntime(const String& id, bool cancelled, bool expired, co
 	Array::Ptr errors = new Array();
 
 	if (!ConfigObjectUtility::DeleteObject(downtime, false, errors)) {
-		ObjectLock olock(errors);
-		for (const String& error : errors) {
+		for (const String& error : errors->GetView()) {
 			Log(LogCritical, "Downtime", error);
 		}
 
@@ -351,16 +350,13 @@ void Downtime::TriggerDowntime()
 
 	Array::Ptr triggers = GetTriggers();
 
-	{
-		ObjectLock olock(triggers);
-		for (const String& triggerName : triggers) {
-			Downtime::Ptr downtime = Downtime::GetByName(triggerName);
+	for (const String& triggerName : triggers->GetView()) {
+		Downtime::Ptr downtime = Downtime::GetByName(triggerName);
 
-			if (!downtime)
-				continue;
+		if (!downtime)
+			continue;
 
-			downtime->TriggerDowntime();
-		}
+		downtime->TriggerDowntime();
 	}
 
 	OnDowntimeTriggered(this);
