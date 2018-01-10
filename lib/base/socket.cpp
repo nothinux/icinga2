@@ -64,8 +64,10 @@ void Socket::SetFD(SOCKET fd)
 #endif /* _WIN32 */
 	}
 
-	ObjectLock olock(this);
-	m_FD = fd;
+	{
+		boost::mutex::scoped_lock lock(m_FDMutex);
+		m_FD = fd;
+	}
 }
 
 /**
@@ -75,8 +77,7 @@ void Socket::SetFD(SOCKET fd)
  */
 SOCKET Socket::GetFD() const
 {
-	ObjectLock olock(this);
-
+	boost::mutex::scoped_lock lock(m_FDMutex);
 	return m_FD;
 }
 
@@ -85,12 +86,17 @@ SOCKET Socket::GetFD() const
  */
 void Socket::Close()
 {
-	ObjectLock olock(this);
+	SOCKET fd = INVALID_SOCKET;
 
-	if (m_FD != INVALID_SOCKET) {
-		closesocket(m_FD);
+	{
+		boost::mutex::scoped_lock lock(m_FDMutex);
+
+		fd = m_FD;
 		m_FD = INVALID_SOCKET;
 	}
+
+	if (fd != INVALID_SOCKET)
+		closesocket(fd);
 }
 
 /**

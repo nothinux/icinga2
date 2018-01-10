@@ -21,9 +21,18 @@
 #define OBJECTLOCK_H
 
 #include "base/object.hpp"
+#include <boost/thread/recursive_mutex.hpp>
 
 namespace icinga
 {
+
+class Lockable
+{
+private:
+	mutable boost::recursive_mutex m_Mutex;
+
+	friend struct ObjectLock;
+};
 
 /**
  * A scoped lock for Objects.
@@ -31,21 +40,20 @@ namespace icinga
 struct ObjectLock
 {
 public:
-	ObjectLock(const Object::Ptr& object);
-	ObjectLock(const Object *object);
+	ObjectLock(const Lockable *object);
+
+	template<typename T>
+	ObjectLock(const intrusive_ptr<T>& object)
+		: ObjectLock(static_cast<const Lockable *>(object.get()))
+	{ }
 
 	~ObjectLock();
 
-	static void LockMutex(const Object *object);
-
 	void Lock();
-
-	static void Spin(unsigned int it);
-
 	void Unlock();
 
 private:
-	const Object *m_Object{nullptr};
+	const Lockable *m_Object{nullptr};
 	bool m_Locked{false};
 };
 

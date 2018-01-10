@@ -1,8 +1,8 @@
 provider icinga {
 	probe object__ctor(void *obj);
-	probe object__dtor(void *obj, int had_mutex);
+	probe object__dtor(void *obj);
 
-	probe ptr__add_ref(void *ptr);
+	probe ptr__addref(void *ptr);
 	probe ptr__release(void *ptr);
 
 	probe wq__full(void *wq);

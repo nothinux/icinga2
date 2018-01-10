@@ -23,6 +23,7 @@
 #include "base/i2-base.hpp"
 #include "base/configobject.thpp"
 #include "base/object.hpp"
+#include "base/objectlock.hpp"
 #include "base/type.hpp"
 #include "base/dictionary.hpp"
 #include <boost/signals2.hpp>
@@ -37,7 +38,7 @@ class ConfigType;
  *
  * @ingroup base
  */
-class ConfigObject : public ObjectImpl<ConfigObject>
+class ConfigObject : public ObjectImpl<ConfigObject>, public Lockable
 {
 public:
 	DECLARE_OBJECT(ConfigObject);

@@ -48,8 +48,7 @@ Object::Object()
  */
 Object::~Object()
 {
-	ICINGA_OBJECT_DTOR(this, m_Mutex != 0);
-	delete reinterpret_cast<boost::recursive_mutex *>(m_Mutex);
+	ICINGA_OBJECT_DTOR(this);
 }
 
 /**
@@ -59,26 +58,6 @@ String Object::ToString() const
 {
 	return "Object of type '" + GetReflectionType()->GetName() + "'";
 }
-
-#ifdef I2_DEBUG
-/**
- * Checks if the calling thread owns the lock on this object.
- *
- * @returns True if the calling thread owns the lock, false otherwise.
- */
-bool Object::OwnsLock() const
-{
-#ifdef _WIN32
-	DWORD tid = InterlockedExchangeAdd(&m_LockOwner, 0);
-
-	return (tid == GetCurrentThreadId());
-#else /* _WIN32 */
-	pthread_t tid = __sync_fetch_and_add(&m_LockOwner, 0);
-
-	return (tid == pthread_self());
-#endif /* _WIN32 */
-}
-#endif /* I2_DEBUG */
 
 void Object::SetField(int id, const Value&, bool, const Value&)
 {
@@ -260,7 +239,7 @@ INITIALIZE_ONCE([]() {
 
 void icinga::intrusive_ptr_add_ref(Object *object)
 {
-	ICINGA_PTR_ADD_REF(object);
+	ICINGA_PTR_ADDREF(object);
 
 #ifdef I2_LEAK_DEBUG
 	if (object->m_References == 0)
@@ -293,4 +272,10 @@ void icinga::intrusive_ptr_release(Object *object)
 
 		delete object;
 	}
+}
+
+void icinga::DefaultObjectFactoryCheckArgs(const std::vector<Value>& args)
+{
+	if (!args.empty())
+		BOOST_THROW_EXCEPTION(std::invalid_argument("Constructor does not take any arguments."));
 }

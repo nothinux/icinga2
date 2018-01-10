@@ -87,7 +87,7 @@ DbType::Ptr DbType::GetByID(long tid)
 
 DbObject::Ptr DbType::GetOrCreateObjectByName(const String& name1, const String& name2)
 {
-	ObjectLock olock(this);
+	boost::mutex::scoped_lock lock(m_Mutex);
 
 	auto it = m_Objects.find(std::make_pair(name1, name2));
 

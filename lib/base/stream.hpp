@@ -22,7 +22,10 @@
 
 #include "base/i2-base.hpp"
 #include "base/object.hpp"
+#include "base/objectlock.hpp"
 #include <boost/signals2.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/condition_variable.hpp>
 
 namespace icinga
 {
@@ -64,7 +67,7 @@ enum StreamReadStatus
  *
  * @ingroup base
  */
-class Stream : public Object
+class Stream : public Object, public Lockable
 {
 public:
 	DECLARE_PTR_TYPEDEFS(Stream);
