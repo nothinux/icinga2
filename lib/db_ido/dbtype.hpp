@@ -24,6 +24,7 @@
 #include "base/object.hpp"
 #include "base/registry.hpp"
 #include "base/singleton.hpp"
+#include <boost/thread/mutex.hpp>
 #include <set>
 
 namespace icinga
@@ -71,6 +72,7 @@ private:
 	static boost::mutex& GetStaticMutex();
 	static TypeMap& GetTypes();
 
+	boost::mutex m_Mutex;
 	ObjectMap m_Objects;
 };
 

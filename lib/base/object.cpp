@@ -39,40 +39,12 @@ static Timer::Ptr l_ObjectCountTimer;
 #endif /* I2_LEAK_DEBUG */
 
 /**
- * Destructor for the Object class.
- */
-Object::~Object()
-{
-	delete reinterpret_cast<boost::recursive_mutex *>(m_Mutex);
-}
-
-/**
  * Returns a string representation for the object.
  */
 String Object::ToString() const
 {
 	return "Object of type '" + GetReflectionType()->GetName() + "'";
 }
-
-#ifdef I2_DEBUG
-/**
- * Checks if the calling thread owns the lock on this object.
- *
- * @returns True if the calling thread owns the lock, false otherwise.
- */
-bool Object::OwnsLock() const
-{
-#ifdef _WIN32
-	DWORD tid = InterlockedExchangeAdd(&m_LockOwner, 0);
-
-	return (tid == GetCurrentThreadId());
-#else /* _WIN32 */
-	pthread_t tid = __sync_fetch_and_add(&m_LockOwner, 0);
-
-	return (tid == pthread_self());
-#endif /* _WIN32 */
-}
-#endif /* I2_DEBUG */
 
 void Object::SetField(int id, const Value&, bool, const Value&)
 {
@@ -283,4 +255,10 @@ void icinga::intrusive_ptr_release(Object *object)
 
 		delete object;
 	}
+}
+
+void icinga::DefaultObjectFactoryCheckArgs(const std::vector<Value>& args)
+{
+	if (!args.empty())
+		BOOST_THROW_EXCEPTION(std::invalid_argument("Constructor does not take any arguments."));
 }

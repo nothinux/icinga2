@@ -272,7 +272,7 @@ String Downtime::AddDowntime(const Checkable::Ptr& checkable, const String& auth
 		Array::Ptr triggers = parentDowntime->GetTriggers();
 
 		//XXX:rcu
-		ObjectLock olock(triggers);
+		//ObjectLock olock(triggers);
 		if (!triggers->Contains(fullName))
 			triggers->Add(fullName);
 	}

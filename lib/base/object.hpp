@@ -22,7 +22,6 @@
 
 #include "base/i2-base.hpp"
 #include "base/debug.hpp"
-#include <boost/thread/condition_variable.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <vector>
 
@@ -58,11 +57,12 @@ extern Value Empty;
 	DECLARE_PTR_TYPEDEFS(klass); \
 	IMPL_TYPE_LOOKUP();
 
+void DefaultObjectFactoryCheckArgs(const std::vector<Value>& args);
+
 template<typename T>
 intrusive_ptr<Object> DefaultObjectFactory(const std::vector<Value>& args)
 {
-	if (!args.empty())
-		BOOST_THROW_EXCEPTION(std::invalid_argument("Constructor does not take any arguments."));
+	DefaultObjectFactoryCheckArgs(args);
 
 	return new T();
 }
@@ -167,7 +167,7 @@ public:
 	DECLARE_PTR_TYPEDEFS(Object);
 
 	Object() = default;
-	virtual ~Object();
+	virtual ~Object() = default;
 
 	virtual String ToString() const;
 
@@ -185,10 +185,6 @@ public:
 	virtual void NotifyField(int id, const Value& cookie = Empty);
 	virtual Object::Ptr NavigateField(int id) const;
 
-#ifdef I2_DEBUG
-	bool OwnsLock() const;
-#endif /* I2_DEBUG */
-
 	static Object::Ptr GetPrototype();
 
 	virtual Object::Ptr Clone() const;
@@ -200,17 +196,6 @@ private:
 	Object& operator=(const Object& rhs) = delete;
 
 	uintptr_t m_References{0};
-	mutable uintptr_t m_Mutex{0};
-
-#ifdef I2_DEBUG
-#	ifndef _WIN32
-	mutable pthread_t m_LockOwner;
-#	else /* _WIN32 */
-	mutable DWORD m_LockOwner;
-#	endif /* _WIN32 */
-#endif /* I2_DEBUG */
-
-	friend struct ObjectLock;
 
 	friend void intrusive_ptr_add_ref(Object *object);
 	friend void intrusive_ptr_release(Object *object);

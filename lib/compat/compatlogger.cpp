@@ -445,8 +445,6 @@ String CompatLogger::GetHostStateString(const Host::Ptr& host)
 
 void CompatLogger::WriteLine(const String& line)
 {
-	ASSERT(OwnsLock());
-
 	if (!m_OutputFile.good())
 		return;
 
@@ -455,8 +453,6 @@ void CompatLogger::WriteLine(const String& line)
 
 void CompatLogger::Flush()
 {
-	ASSERT(OwnsLock());
-
 	if (!m_OutputFile.good())
 		return;
 

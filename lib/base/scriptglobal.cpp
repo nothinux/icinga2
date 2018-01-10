@@ -57,7 +57,7 @@ void ScriptGlobal::Set(const String& name, const Value& value)
 
 	//XXX:cu
 	{
-		ObjectLock olock(m_Globals);
+		//ObjectLock olock(m_Globals);
 
 		Dictionary::Ptr parent = m_Globals;
 

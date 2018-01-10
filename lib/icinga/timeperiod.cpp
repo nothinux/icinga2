@@ -57,8 +57,6 @@ void TimePeriod::Start(bool runtimeCreated)
 
 void TimePeriod::AddSegment(double begin, double end)
 {
-	ASSERT(OwnsLock());
-
 	Log(LogDebug, "TimePeriod")
 		<< "Adding segment '" << Utility::FormatDateTime("%c", begin) << "' <-> '"
 		<< Utility::FormatDateTime("%c", end) << "' to TimePeriod '" << GetName() << "'";
@@ -117,8 +115,6 @@ void TimePeriod::AddSegment(const Dictionary::Ptr& segment)
 
 void TimePeriod::RemoveSegment(double begin, double end)
 {
-	ASSERT(OwnsLock());
-
 	Log(LogDebug, "TimePeriod")
 		<< "Removing segment '" << Utility::FormatDateTime("%c", begin) << "' <-> '"
 		<< Utility::FormatDateTime("%c", end) << "' from TimePeriod '" << GetName() << "'";
@@ -186,8 +182,6 @@ void TimePeriod::RemoveSegment(const Dictionary::Ptr& segment)
 
 void TimePeriod::PurgeSegments(double end)
 {
-	ASSERT(OwnsLock());
-
 	Log(LogDebug, "TimePeriod")
 		<< "Purging segments older than '" << Utility::FormatDateTime("%c", end)
 		<< "' from TimePeriod '" << GetName() << "'";

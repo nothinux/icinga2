@@ -343,16 +343,12 @@ bool ConfigObject::IsAttributeModified(const String& attr) const
 
 void ConfigObject::Register()
 {
-	ASSERT(!OwnsLock());
-
 	TypeImpl<ConfigObject>::Ptr type = static_pointer_cast<TypeImpl<ConfigObject> >(GetReflectionType());
 	type->RegisterObject(this);
 }
 
 void ConfigObject::Unregister()
 {
-	ASSERT(!OwnsLock());
-
 	TypeImpl<ConfigObject>::Ptr type = static_pointer_cast<TypeImpl<ConfigObject> >(GetReflectionType());
 	type->UnregisterObject(this);
 }
