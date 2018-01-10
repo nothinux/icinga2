@@ -103,4 +103,8 @@
 
 using namespace std::placeholders;
 
+#ifdef HAVE_DTRACE
+#	include "base/icinga-dtrace.h"
+#endif /* HAVE_DTRACE */
+
 #endif /* I2BASE_H */

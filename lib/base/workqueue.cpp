@@ -85,8 +85,10 @@ void WorkQueue::EnqueueUnlocked(boost::mutex::scoped_lock& lock, std::function<v
 	bool wq_thread = IsWorkerThread();
 
 	if (!wq_thread) {
-		while (m_Tasks.size() >= m_MaxItems && m_MaxItems != 0)
+		while (m_Tasks.size() >= m_MaxItems && m_MaxItems != 0) {
+			ICINGA_WQ_FULL(this);
 			m_CVFull.wait(lock);
+		}
 	}
 
 	m_Tasks.emplace(std::move(function), priority, ++m_NextTaskID);
@@ -106,6 +108,8 @@ void WorkQueue::Enqueue(std::function<void ()>&& function, WorkQueuePriority pri
 	bool wq_thread = IsWorkerThread();
 
 	if (wq_thread && allowInterleaved) {
+		ICINGA_WQ_TASK_INTERLEAVED(this);
+
 		function();
 
 		return;
@@ -276,8 +280,10 @@ void WorkQueue::WorkerThreadProc()
 	boost::mutex::scoped_lock lock(m_Mutex);
 
 	for (;;) {
-		while (m_Tasks.empty() && !m_Stopped)
+		while (m_Tasks.empty() && !m_Stopped) {
+			ICINGA_WQ_STARVED(this);
 			m_CVEmpty.wait(lock);
+		}
 
 		if (m_Stopped)
 			break;
@@ -292,7 +298,9 @@ void WorkQueue::WorkerThreadProc()
 
 		lock.unlock();
 
+		ICINGA_WQ_TASK_BEGIN(this);
 		RunTaskFunction(task.Function);
+		ICINGA_WQ_TASK_END(this);
 
 		/* clear the task so whatever other resources it holds are released _before_ we re-acquire the mutex */
 		task = Task();

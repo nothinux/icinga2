@@ -37,6 +37,7 @@ option(ICINGA2_WITH_NOTIFICATION "Build the notification module" ON)
 option(ICINGA2_WITH_PERFDATA "Build the perfdata module" ON)
 option(ICINGA2_WITH_STUDIO "Build the Icinga Studio application" OFF)
 option(ICINGA2_WITH_TESTS "Run unit tests" ON)
+option(ICINGA2_WITH_TRACING "Enable low-overhead static tracing (DTrace)" OFF)
 
 file(STRINGS icinga2.spec VERSION_LINE REGEX "^Version: ")
 string(REPLACE "Version: " "" ICINGA2_VERSION ${VERSION_LINE})
@@ -96,6 +97,18 @@ if(WIN32)
   add_definitions(-DBOOST_ALL_NO_LIB)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /bigobj")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /bigobj")
+endif()
+
+set(HAVE_DTRACE ${ICINGA2_WITH_TRACING})
+
+if(ICINGA2_WITH_TRACING)
+  find_program(DTRACE_EXECUTABLE
+    NAME dtrace
+    DOC "path to the dtrace executable"
+    PATHS /usr/sbin
+  )
+
+  message(STATUS "DTrace executable: ${DTRACE_EXECUTABLE}")
 endif()
 
 if(NOT DEFINED LOGROTATE_HAS_SU)

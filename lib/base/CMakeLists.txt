@@ -91,6 +91,30 @@ set(base_SOURCES
   workqueue.cpp workqueue.hpp
 )
 
+if(ICINGA2_WITH_TRACING)
+  add_custom_command(
+    OUTPUT icinga-dtrace.h
+    COMMAND ${DTRACE_EXECUTABLE}
+    ARGS -h -s icinga.d -o ${CMAKE_CURRENT_BINARY_DIR}/icinga-dtrace.h
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    DEPENDS icinga.d
+  )
+
+  list(APPEND base_SOURCES "icinga-dtrace.h")
+
+  if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+    add_custom_command(
+      OUTPUT icinga-dtrace.o
+      COMMAND ${DTRACE_EXECUTABLE}
+      ARGS -G -s icinga.d -o ${CMAKE_CURRENT_BINARY_DIR}/icinga-dtrace.o
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+      DEPENDS icinga.d
+    )
+
+    list(APPEND base_SOURCES "icinga-dtrace.o")
+  endif()
+endif()
+
 set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/application-version.cpp PROPERTY EXCLUDE_UNITY_BUILD TRUE)
 
 if(ICINGA2_UNITY_BUILD)

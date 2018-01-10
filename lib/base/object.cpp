@@ -38,11 +38,17 @@ static std::map<String, int> l_ObjectCounts;
 static Timer::Ptr l_ObjectCountTimer;
 #endif /* I2_LEAK_DEBUG */
 
+Object::Object()
+{
+	ICINGA_OBJECT_CTOR(this);
+}
+
 /**
  * Destructor for the Object class.
  */
 Object::~Object()
 {
+	ICINGA_OBJECT_DTOR(this, m_Mutex != 0);
 	delete reinterpret_cast<boost::recursive_mutex *>(m_Mutex);
 }
 
@@ -254,6 +260,8 @@ INITIALIZE_ONCE([]() {
 
 void icinga::intrusive_ptr_add_ref(Object *object)
 {
+	ICINGA_PTR_ADD_REF(object);
+
 #ifdef I2_LEAK_DEBUG
 	if (object->m_References == 0)
 		TypeAddObject(object);
@@ -269,6 +277,8 @@ void icinga::intrusive_ptr_add_ref(Object *object)
 void icinga::intrusive_ptr_release(Object *object)
 {
 	uintptr_t refs;
+
+	ICINGA_PTR_RELEASE(object);
 
 #ifdef _WIN32
 	refs = InterlockedDecrement(&object->m_References);

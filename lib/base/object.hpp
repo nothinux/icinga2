@@ -166,7 +166,7 @@ class Object
 public:
 	DECLARE_PTR_TYPEDEFS(Object);
 
-	Object() = default;
+	Object();
 	virtual ~Object();
 
 	virtual String ToString() const;
