@@ -215,8 +215,7 @@ Value ContactsTable::CustomVariableNamesAccessor(const Value& row)
 	if (!vars)
 		return cv;
 
-	ObjectLock olock(vars);
-	for (const Dictionary::Pair& kv : vars) {
+	for (const Dictionary::Pair& kv : vars->GetView()) {
 		cv->Add(kv.first);
 	}
 
@@ -242,8 +241,7 @@ Value ContactsTable::CustomVariableValuesAccessor(const Value& row)
 	if (!vars)
 		return cv;
 
-	ObjectLock olock(vars);
-	for (const Dictionary::Pair& kv : vars) {
+	for (const Dictionary::Pair& kv : vars->GetView()) {
 		if (kv.second.IsObjectType<Array>() || kv.second.IsObjectType<Dictionary>())
 			cv->Add(JsonEncode(kv.second));
 		else
@@ -272,8 +270,7 @@ Value ContactsTable::CustomVariablesAccessor(const Value& row)
 	if (!vars)
 		return cv;
 
-	ObjectLock olock(vars);
-	for (const Dictionary::Pair& kv : vars) {
+	for (const Dictionary::Pair& kv : vars->GetView()) {
 		Array::Ptr key_val = new Array();
 		key_val->Add(kv.first);
 
@@ -307,8 +304,7 @@ Value ContactsTable::CVIsJsonAccessor(const Value& row)
 
 	bool cv_is_json = false;
 
-	ObjectLock olock(vars);
-	for (const Dictionary::Pair& kv : vars) {
+	for (const Dictionary::Pair& kv : vars->GetView()) {
 		if (kv.second.IsObjectType<Array>() || kv.second.IsObjectType<Dictionary>())
 			cv_is_json = true;
 	}

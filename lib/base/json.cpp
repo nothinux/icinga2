@@ -43,8 +43,7 @@ static void EncodeDictionary(yajl_gen handle, const Dictionary::Ptr& dict)
 {
 	yajl_gen_map_open(handle);
 
-	ObjectLock olock(dict);
-	for (const Dictionary::Pair& kv : dict) {
+	for (const Dictionary::Pair& kv : dict->GetView()) {
 		yajl_gen_string(handle, reinterpret_cast<const unsigned char *>(kv.first.CStr()), kv.first.GetLength());
 		Encode(handle, kv.second);
 	}

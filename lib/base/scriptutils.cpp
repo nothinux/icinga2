@@ -382,16 +382,15 @@ Type::Ptr ScriptUtils::TypeOf(const Value& value)
 
 Array::Ptr ScriptUtils::Keys(const Dictionary::Ptr& dict)
 {
-	Array::Ptr result = new Array();
+	ArrayData result;
 
 	if (dict) {
-		ObjectLock olock(dict);
-		for (const Dictionary::Pair& kv : dict) {
-			result->Add(kv.first);
+		for (const Dictionary::Pair& kv : dict->GetView()) {
+			result.push_back(kv.first);
 		}
 	}
 
-	return result;
+	return new Array(std::move(result));
 }
 
 ConfigObject::Ptr ScriptUtils::GetObject(const Value& vtype, const String& name)

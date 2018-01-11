@@ -238,11 +238,8 @@ Value StatusTable::CustomVariableNamesAccessor(const Value&)
 	if (!vars)
 		return cv;
 
-	{
-		ObjectLock olock(vars);
-		for (const auto& kv : vars) {
-			cv->Add(kv.first);
-		}
+	for (const auto& kv : vars->GetView()) {
+		cv->Add(kv.first);
 	}
 
 	return cv;
@@ -257,11 +254,8 @@ Value StatusTable::CustomVariableValuesAccessor(const Value&)
 	if (!vars)
 		return cv;
 
-	{
-		ObjectLock olock(vars);
-		for (const auto& kv : vars) {
-			cv->Add(kv.second);
-		}
+	for (const auto& kv : vars->GetView()) {
+		cv->Add(kv.second);
 	}
 
 	return cv;
@@ -276,14 +270,11 @@ Value StatusTable::CustomVariablesAccessor(const Value&)
 	if (!vars)
 		return cv;
 
-	{
-		ObjectLock olock(vars);
-		for (const auto& kv : vars) {
-			Array::Ptr key_val = new Array();
-			key_val->Add(kv.first);
-			key_val->Add(kv.second);
-			cv->Add(key_val);
-		}
+	for (const auto& kv : vars->GetView()) {
+		Array::Ptr key_val = new Array();
+		key_val->Add(kv.first);
+		key_val->Add(kv.second);
+		cv->Add(key_val);
 	}
 
 	return cv;

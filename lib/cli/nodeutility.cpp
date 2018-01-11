@@ -270,8 +270,7 @@ void NodeUtility::SerializeObject(std::ostream& fp, const Dictionary::Ptr& objec
 	ConfigWriter::EmitValue(fp, 0, object->Get("__name"));
 	fp << " {\n";
 
-	ObjectLock olock(object);
-	for (const Dictionary::Pair& kv : object) {
+	for (const Dictionary::Pair& kv : object->GetView()) {
 		if (kv.first == "__type" || kv.first == "__name")
 			continue;
 

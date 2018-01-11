@@ -70,8 +70,7 @@ String ConfigObjectUtility::CreateObjectConfig(const Type::Ptr& type, const Stri
 	if (attrs) {
 		attrs->CopyTo(allAttrs);
 
-		ObjectLock olock(attrs);
-		for (const Dictionary::Pair& kv : attrs) {
+		for (const Dictionary::Pair& kv : attrs->GetView()) {
 			int fid = type->GetFieldId(kv.first.SubStr(0, kv.first.FindFirstOf(".")));
 
 			if (fid < 0)

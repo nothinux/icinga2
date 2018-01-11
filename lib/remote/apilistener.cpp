@@ -1209,8 +1209,7 @@ void ApiListener::StatsFunc(const Dictionary::Ptr& status, const Array::Ptr& per
 
 	stats = listener->GetStatus();
 
-	ObjectLock olock(stats.second);
-	for (const Dictionary::Pair& kv : stats.second)
+	for (const Dictionary::Pair& kv : stats.second->GetView())
 		perfdata->Add(new PerfdataValue("api_" + kv.first, kv.second));
 
 	status->Set("api", stats.first);

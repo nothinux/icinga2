@@ -41,15 +41,17 @@ static Array::Ptr SerializeArray(const Array::Ptr& input, int attributeTypes)
 
 static Dictionary::Ptr SerializeDictionary(const Dictionary::Ptr& input, int attributeTypes)
 {
-	Dictionary::Ptr result = new Dictionary();
+	DictionaryData result;
 
-	ObjectLock olock(input);
+	auto data = input->GetView();
 
-	for (const Dictionary::Pair& kv : input) {
-		result->Set(kv.first, Serialize(kv.second, attributeTypes));
+	result.reserve(data->size());
+
+	for (const Dictionary::Pair& kv : data) {
+		result.emplace_back(kv.first, Serialize(kv.second, attributeTypes));
 	}
 
-	return result;
+	return new Dictionary(std::move(result));
 }
 
 static Object::Ptr SerializeObject(const Object::Ptr& input, int attributeTypes)
@@ -59,7 +61,9 @@ static Object::Ptr SerializeObject(const Object::Ptr& input, int attributeTypes)
 	if (!type)
 		return nullptr;
 
-	Dictionary::Ptr fields = new Dictionary();
+	DictionaryData fields;
+
+	int fieldCount = 0;
 
 	for (int i = 0; i < type->GetFieldCount(); i++) {
 		Field field = type->GetFieldInfo(i);
@@ -67,12 +71,31 @@ static Object::Ptr SerializeObject(const Object::Ptr& input, int attributeTypes)
 		if (attributeTypes != 0 && (field.Attributes & attributeTypes) == 0)
 			continue;
 
-		fields->Set(field.Name, Serialize(input->GetField(i), attributeTypes));
+			if (strcmp(field.Name, "type") == 0)
+				continue;
+
+			fieldCount++;
 	}
 
-	fields->Set("type", type->GetName());
+	fieldCount++; /* for 'type' */
 
-	return fields;
+	fields.reserve(fieldCount);
+
+	for (int i = 0; i < type->GetFieldCount(); i++) {
+		Field field = type->GetFieldInfo(i);
+
+		if (attributeTypes != 0 && (field.Attributes & attributeTypes) == 0)
+			continue;
+
+		if (strcmp(field.Name, "type") == 0)
+			continue;
+
+		fields.emplace_back(field.Name, Serialize(input->GetField(i), attributeTypes));
+	}
+
+	fields.emplace_back("type", type->GetName());
+
+	return new Dictionary(std::move(fields));
 }
 
 static Array::Ptr DeserializeArray(const Array::Ptr& input, bool safe_mode, int attributeTypes)
@@ -92,15 +115,17 @@ static Array::Ptr DeserializeArray(const Array::Ptr& input, bool safe_mode, int 
 
 static Dictionary::Ptr DeserializeDictionary(const Dictionary::Ptr& input, bool safe_mode, int attributeTypes)
 {
-	Dictionary::Ptr result = new Dictionary();
+	DictionaryData result;
 
-	ObjectLock olock(input);
+	auto data = input->GetView();
 
-	for (const Dictionary::Pair& kv : input) {
-		result->Set(kv.first, Deserialize(kv.second, safe_mode, attributeTypes));
+	result.reserve(data->size());
+
+	for (const Dictionary::Pair& kv : data) {
+		result.emplace_back(kv.first, Deserialize(kv.second, safe_mode, attributeTypes));
 	}
 
-	return result;
+	return new Dictionary(std::move(result));
 }
 
 static Object::Ptr DeserializeObject(const Object::Ptr& object, const Dictionary::Ptr& input, bool safe_mode, int attributeTypes)
@@ -125,8 +150,7 @@ static Object::Ptr DeserializeObject(const Object::Ptr& object, const Dictionary
 	else
 		instance = type->Instantiate(std::vector<Value>());
 
-	ObjectLock olock(input);
-	for (const Dictionary::Pair& kv : input) {
+	for (const Dictionary::Pair& kv : input->GetView()) {
 		if (kv.first.IsEmpty())
 			continue;
 

@@ -138,8 +138,7 @@ void StatusDataWriter::DumpTimePeriod(std::ostream& fp, const TimePeriod::Ptr& t
 	Dictionary::Ptr ranges = tp->GetRanges();
 
 	if (ranges) {
-		ObjectLock olock(ranges);
-		for (const Dictionary::Pair& kv : ranges) {
+		for (const Dictionary::Pair& kv : ranges->GetView()) {
 			fp << "\t" << kv.first << "\t" << kv.second << "\n";
 		}
 	}
@@ -514,8 +513,7 @@ void StatusDataWriter::DumpCustomAttributes(std::ostream& fp, const CustomVarObj
 
 	bool is_json = false;
 
-	ObjectLock olock(vars);
-	for (const Dictionary::Pair& kv : vars) {
+	for (const Dictionary::Pair& kv : vars->GetView()) {
 		if (kv.first.IsEmpty())
 			continue;
 

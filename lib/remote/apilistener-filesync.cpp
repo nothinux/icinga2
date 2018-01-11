@@ -112,28 +112,25 @@ bool ApiListener::UpdateConfigDir(const ConfigDirInformation& oldConfigInfo, con
 
 	size_t numBytes = 0;
 
-	{
-		ObjectLock olock(newConfig);
-		for (const Dictionary::Pair& kv : newConfig) {
-			if (oldConfig->Get(kv.first) != kv.second) {
-				if (!Utility::Match("*/.timestamp", kv.first))
-					configChange = true;
+	for (const Dictionary::Pair& kv : newConfig->GetView()) {
+		if (oldConfig->Get(kv.first) != kv.second) {
+			if (!Utility::Match("*/.timestamp", kv.first))
+				configChange = true;
 
-				String path = configDir + "/" + kv.first;
-				Log(LogInformation, "ApiListener")
-					<< "Updating configuration file: " << path;
+			String path = configDir + "/" + kv.first;
+			Log(LogInformation, "ApiListener")
+				<< "Updating configuration file: " << path;
 
-				/* Sync string content only. */
-				String content = kv.second;
+			/* Sync string content only. */
+			String content = kv.second;
 
-				/* Generate a directory tree (zones/1/2/3 might not exist yet). */
-				Utility::MkDirP(Utility::DirName(path), 0755);
-				std::ofstream fp(path.CStr(), std::ofstream::out | std::ostream::binary | std::ostream::trunc);
-				fp << content;
-				fp.close();
+			/* Generate a directory tree (zones/1/2/3 might not exist yet). */
+			Utility::MkDirP(Utility::DirName(path), 0755);
+			std::ofstream fp(path.CStr(), std::ofstream::out | std::ostream::binary | std::ostream::trunc);
+			fp << content;
+			fp.close();
 
-				numBytes += content.GetLength();
-			}
+			numBytes += content.GetLength();
 		}
 	}
 
@@ -145,8 +142,7 @@ bool ApiListener::UpdateConfigDir(const ConfigDirInformation& oldConfigInfo, con
 		<< Utility::FormatDateTime("%Y-%m-%d %H:%M:%S %z", oldTimestamp) << "' ("
 		<< oldTimestamp << ").";
 
-	ObjectLock xlock(oldConfig);
-	for (const Dictionary::Pair& kv : oldConfig) {
+	for (const Dictionary::Pair& kv : oldConfig->GetView()) {
 		if (!newConfig->Contains(kv.first)) {
 			configChange = true;
 
@@ -182,18 +178,12 @@ void ApiListener::SyncZoneDir(const Zone::Ptr& zone) const
 	for (const ZoneFragment& zf : ConfigCompiler::GetZoneDirs(zone->GetName())) {
 		ConfigDirInformation newConfigPart = LoadConfigDir(zf.Path);
 
-		{
-			ObjectLock olock(newConfigPart.UpdateV1);
-			for (const Dictionary::Pair& kv : newConfigPart.UpdateV1) {
-				newConfigInfo.UpdateV1->Set("/" + zf.Tag + kv.first, kv.second);
-			}
+		for (const Dictionary::Pair& kv : newConfigPart.UpdateV1->GetView()) {
+			newConfigInfo.UpdateV1->Set("/" + zf.Tag + kv.first, kv.second);
 		}
 
-		{
-			ObjectLock olock(newConfigPart.UpdateV2);
-			for (const Dictionary::Pair& kv : newConfigPart.UpdateV2) {
-				newConfigInfo.UpdateV2->Set("/" + zf.Tag + kv.first, kv.second);
-			}
+		for (const Dictionary::Pair& kv : newConfigPart.UpdateV2->GetView()) {
+			newConfigInfo.UpdateV2->Set("/" + zf.Tag + kv.first, kv.second);
 		}
 	}
 
@@ -299,8 +289,7 @@ Value ApiListener::ConfigUpdateHandler(const MessageOrigin::Ptr& origin, const D
 
 	bool configChange = false;
 
-	ObjectLock olock(updateV1);
-	for (const Dictionary::Pair& kv : updateV1) {
+	for (const Dictionary::Pair& kv : updateV1->GetView()) {
 		Zone::Ptr zone = Zone::GetByName(kv.first);
 
 		if (!zone) {

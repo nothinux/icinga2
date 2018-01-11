@@ -90,8 +90,7 @@ bool ModifyObjectHandler::HandleRequest(const ApiUser::Ptr& user, HttpRequest& r
 
 		try {
 			if (attrs) {
-				ObjectLock olock(attrs);
-				for (const Dictionary::Pair& kv : attrs) {
+				for (const Dictionary::Pair& kv : attrs->GetView()) {
 					key = kv.first;
 					obj->ModifyAttribute(kv.first, kv.second);
 				}

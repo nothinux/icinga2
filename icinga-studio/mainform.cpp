@@ -208,12 +208,9 @@ wxPGProperty *MainForm::ValueToProperty(const String& name, const Value& value)
 
 		Dictionary::Ptr dict = value;
 
-		{
-			ObjectLock olock(dict);
-			for (const Dictionary::Pair& kv : dict) {
-				if (kv.first != "type")
-					prop->AppendChild(ValueToProperty(kv.first, kv.second));
-			}
+		for (const Dictionary::Pair& kv : dict->GetView()) {
+			if (kv.first != "type")
+				prop->AppendChild(ValueToProperty(kv.first, kv.second));
 		}
 
 		String type = "Dictionary";

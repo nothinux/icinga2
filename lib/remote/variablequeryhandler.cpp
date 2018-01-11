@@ -48,12 +48,9 @@ public:
 	void FindTargets(const String& type,
 		const std::function<void (const Value&)>& addTarget) const override
 	{
-		{
-			Dictionary::Ptr globals = ScriptGlobal::GetGlobals();
-			ObjectLock olock(globals);
-			for (const Dictionary::Pair& kv : globals) {
-				addTarget(GetTargetForVar(kv.first, kv.second));
-			}
+		Dictionary::Ptr globals = ScriptGlobal::GetGlobals();
+		for (const Dictionary::Pair& kv : globals->GetView()) {
+			addTarget(GetTargetForVar(kv.first, kv.second));
 		}
 	}
 
