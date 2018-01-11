@@ -260,12 +260,7 @@ Array::Ptr ScriptUtils::Union(const std::vector<Value>& arguments)
 		}
 	}
 
-	Array::Ptr result = new Array();
-	for (const Value& value : values) {
-		result->Add(value);
-	}
-
-	return result;
+	return Array::FromSet(values);
 }
 
 Array::Ptr ScriptUtils::Intersection(const std::vector<Value>& arguments)
@@ -363,16 +358,16 @@ Array::Ptr ScriptUtils::Range(const std::vector<Value>& arguments)
 			BOOST_THROW_EXCEPTION(std::invalid_argument("Invalid number of arguments for range()"));
 	}
 
-	Array::Ptr result = new Array();
+	ArrayData result;
 
 	if ((start < end && increment <= 0) ||
 		(start > end && increment >= 0))
-		return result;
+		return new Array();
 
 	for (double i = start; (increment > 0 ? i < end : i > end); i += increment)
-		result->Add(i);
+		result.push_back(i);
 
-	return result;
+	return new Array(std::move(result));
 }
 
 Type::Ptr ScriptUtils::TypeOf(const Value& value)
@@ -420,12 +415,12 @@ Array::Ptr ScriptUtils::GetObjects(const Type::Ptr& type)
 	if (!ctype)
 		BOOST_THROW_EXCEPTION(std::invalid_argument("Invalid type: Type must inherit from 'ConfigObject'"));
 
-	Array::Ptr result = new Array();
+	ArrayData result;
 
 	for (const ConfigObject::Ptr& object : ctype->GetObjects())
-		result->Add(object);
+		result.push_back(object);
 
-	return result;
+	return new Array(std::move(result));
 }
 
 void ScriptUtils::Assert(const Value& arg)

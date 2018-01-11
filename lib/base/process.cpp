@@ -199,10 +199,11 @@ static Value ProcessSpawnImpl(struct msghdr *msgh, const Dictionary::Ptr& reques
 
 	delete[] envp;
 
-	Dictionary::Ptr response = new Dictionary();
-	response->Set("rc", pid);
-	if (errorCode)
-		response->Set("errno", errorCode);
+	Dictionary::Ptr response = new Dictionary({
+		{ "rc", pid },
+		{ "errno", errorCode }
+	});
+
 	return response;
 }
 
@@ -215,8 +216,9 @@ static Value ProcessKillImpl(struct msghdr *msgh, const Dictionary::Ptr& request
 	kill(pid, signum);
 	int error = errno;
 
-	Dictionary::Ptr response = new Dictionary();
-	response->Set("errno", error);
+	Dictionary::Ptr response = new Dictionary({
+		{ "errno", error }
+	});
 
 	return response;
 }
@@ -228,9 +230,10 @@ static Value ProcessWaitPIDImpl(struct msghdr *msgh, const Dictionary::Ptr& requ
 	int status;
 	int rc = waitpid(pid, &status, 0);
 
-	Dictionary::Ptr response = new Dictionary();
-	response->Set("status", status);
-	response->Set("rc", rc);
+	Dictionary::Ptr response = new Dictionary({
+		{ "status", status },
+		{ "rc", rc }
+	});
 
 	return response;
 }
@@ -373,11 +376,12 @@ static void StartSpawnProcessHelper()
 
 static pid_t ProcessSpawn(const std::vector<String>& arguments, const Dictionary::Ptr& extraEnvironment, bool adjustPriority, int fds[3])
 {
-	Dictionary::Ptr request = new Dictionary();
-	request->Set("command", "spawn");
-	request->Set("arguments", Array::FromVector(arguments));
-	request->Set("extraEnvironment", extraEnvironment);
-	request->Set("adjustPriority", adjustPriority);
+	Dictionary::Ptr request = new Dictionary({
+		{ "command", "spawn" },
+		{ "arguments", Array::FromVector(arguments) },
+		{ "extraEnvironment", extraEnvironment },
+		{ "adjustPriority", adjustPriority }
+	});
 
 	String jrequest = JsonEncode(request);
 	size_t length = jrequest.GetLength();
@@ -433,10 +437,11 @@ send_message:
 
 static int ProcessKill(pid_t pid, int signum)
 {
-	Dictionary::Ptr request = new Dictionary();
-	request->Set("command", "kill");
-	request->Set("pid", pid);
-	request->Set("signum", signum);
+	Dictionary::Ptr request = new Dictionary({
+		{ "command", "kill" },
+		{ "pid", pid },
+		{ "signum", signum }
+	});
 
 	String jrequest = JsonEncode(request);
 	size_t length = jrequest.GetLength();
@@ -465,9 +470,10 @@ send_message:
 
 static int ProcessWaitPID(pid_t pid, int *status)
 {
-	Dictionary::Ptr request = new Dictionary();
-	request->Set("command", "waitpid");
-	request->Set("pid", pid);
+	Dictionary::Ptr request = new Dictionary({
+		{ "command", "waitpid" },
+		{ "pid", pid }
+	});
 
 	String jrequest = JsonEncode(request);
 	size_t length = jrequest.GetLength();

@@ -97,9 +97,10 @@ void TimePeriod::AddSegment(double begin, double end)
 	}
 
 	/* Create new segment if we weren't able to merge this into an existing segment. */
-	Dictionary::Ptr segment = new Dictionary();
-	segment->Set("begin", begin);
-	segment->Set("end", end);
+	Dictionary::Ptr segment = new Dictionary({
+		{ "begin", begin },
+		{ "end", end }
+	});
 
 	if (!segments) {
 		segments = new Array();

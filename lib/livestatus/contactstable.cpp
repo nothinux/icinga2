@@ -210,16 +210,15 @@ Value ContactsTable::CustomVariableNamesAccessor(const Value& row)
 		vars = CompatUtility::GetCustomAttributeConfig(user);
 	}
 
-	Array::Ptr cv = new Array();
+	ArrayData result;
 
-	if (!vars)
-		return cv;
-
-	for (const Dictionary::Pair& kv : vars->GetView()) {
-		cv->Add(kv.first);
+	if (vars) {
+		for (const Dictionary::Pair& kv : vars->GetView()) {
+			result.push_back(kv.first);
+		}
 	}
 
-	return cv;
+	return new Array(std::move(result));
 }
 
 Value ContactsTable::CustomVariableValuesAccessor(const Value& row)
@@ -236,19 +235,18 @@ Value ContactsTable::CustomVariableValuesAccessor(const Value& row)
 		vars = CompatUtility::GetCustomAttributeConfig(user);
 	}
 
-	Array::Ptr cv = new Array();
+	ArrayData result;
 
-	if (!vars)
-		return cv;
-
-	for (const Dictionary::Pair& kv : vars->GetView()) {
-		if (kv.second.IsObjectType<Array>() || kv.second.IsObjectType<Dictionary>())
-			cv->Add(JsonEncode(kv.second));
-		else
-			cv->Add(kv.second);
+	if (vars) {
+		for (const Dictionary::Pair& kv : vars->GetView()) {
+			if (kv.second.IsObjectType<Array>() || kv.second.IsObjectType<Dictionary>())
+				result.push_back(JsonEncode(kv.second));
+			else
+				result.push_back(kv.second);
+		}
 	}
 
-	return cv;
+	return new Array(std::move(result));
 }
 
 Value ContactsTable::CustomVariablesAccessor(const Value& row)
@@ -265,24 +263,25 @@ Value ContactsTable::CustomVariablesAccessor(const Value& row)
 		vars = CompatUtility::GetCustomAttributeConfig(user);
 	}
 
-	Array::Ptr cv = new Array();
+	ArrayData result;
 
-	if (!vars)
-		return cv;
+	if (vars) {
+		for (const Dictionary::Pair& kv : vars->GetView()) {
+			Value val;
 
-	for (const Dictionary::Pair& kv : vars->GetView()) {
-		Array::Ptr key_val = new Array();
-		key_val->Add(kv.first);
+			if (kv.second.IsObjectType<Array>() || kv.second.IsObjectType<Dictionary>())
+				val = JsonEncode(kv.second);
+			else
+				val = kv.second;
 
-		if (kv.second.IsObjectType<Array>() || kv.second.IsObjectType<Dictionary>())
-			key_val->Add(JsonEncode(kv.second));
-		else
-			key_val->Add(kv.second);
-
-		cv->Add(key_val);
+			result.push_back(new Array({
+				kv.first,
+				val
+			}));
+		}
 	}
 
-	return cv;
+	return new Array(std::move(result));
 }
 
 Value ContactsTable::CVIsJsonAccessor(const Value& row)

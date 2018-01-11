@@ -106,16 +106,15 @@ Value CommandsTable::CustomVariableNamesAccessor(const Value& row)
 		vars = CompatUtility::GetCustomAttributeConfig(command);
 	}
 
-	Array::Ptr cv = new Array();
+	ArrayData keys;
 
-	if (!vars)
-		return cv;
-
-	for (const auto& kv : vars->GetView()) {
-		cv->Add(kv.first);
+	if (vars) {
+		for (const auto& kv : vars->GetView()) {
+			keys.push_back(kv.first);
+		}
 	}
 
-	return cv;
+	return new Array(std::move(keys));
 }
 
 Value CommandsTable::CustomVariableValuesAccessor(const Value& row)
@@ -132,16 +131,15 @@ Value CommandsTable::CustomVariableValuesAccessor(const Value& row)
 		vars = CompatUtility::GetCustomAttributeConfig(command);
 	}
 
-	Array::Ptr cv = new Array();
+	ArrayData keys;
 
-	if (!vars)
-		return cv;
-
-	for (const auto& kv : vars->GetView()) {
-		cv->Add(kv.second);
+	if (vars) {
+		for (const auto& kv : vars->GetView()) {
+			keys.push_back(kv.second);
+		}
 	}
 
-	return cv;
+	return new Array(std::move(keys));
 }
 
 Value CommandsTable::CustomVariablesAccessor(const Value& row)
@@ -158,17 +156,16 @@ Value CommandsTable::CustomVariablesAccessor(const Value& row)
 		vars = CompatUtility::GetCustomAttributeConfig(command);
 	}
 
-	Array::Ptr cv = new Array();
+	ArrayData result;
 
-	if (!vars)
-		return cv;
-
-	for (const auto& kv : vars->GetView()) {
-		Array::Ptr key_val = new Array();
-		key_val->Add(kv.first);
-		key_val->Add(kv.second);
-		cv->Add(key_val);
+	if (vars) {
+		for (const auto& kv : vars->GetView()) {
+			result.push_back(new Array({
+				kv.first,
+				kv.second
+			}));
+		}
 	}
 
-	return cv;
+	return new Array(std::move(result));
 }

@@ -471,7 +471,7 @@ ExpressionResult ArrayExpression::DoEvaluate(ScriptFrame& frame, DebugHint *dhin
 		result.push_back(element.GetValue());
 	}
 
-	return Array::FromVector(result);
+	return new Array(std::move(result));
 }
 
 ExpressionResult DictExpression::DoEvaluate(ScriptFrame& frame, DebugHint *dhint) const

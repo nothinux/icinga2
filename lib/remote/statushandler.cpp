@@ -108,10 +108,9 @@ bool StatusHandler::HandleRequest(const ApiUser::Ptr& user, HttpRequest& request
 		return true;
 	}
 
-	Array::Ptr results = Array::FromVector(objs);
-
-	Dictionary::Ptr result = new Dictionary();
-	result->Set("results", results);
+	Dictionary::Ptr result = new Dictionary({
+		{ "results", new Array(std::move(objs)) }
+	});
 
 	response.SetStatus(200, "OK");
 	HttpUtility::SendJsonBody(response, params, result);

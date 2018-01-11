@@ -361,12 +361,11 @@ String ServiceDbObject::CalculateConfigHash(const Dictionary::Ptr& configFields)
 		if (!parent)
 			continue;
 
-		Array::Ptr depInfo = new Array();
-		depInfo->Add(parent->GetName());
-		depInfo->Add(dep->GetStateFilter());
-		depInfo->Add(dep->GetPeriodRaw());
-
-		dependencies->Add(depInfo);
+		dependencies->Add(new Array({
+			parent->GetName(),
+			dep->GetStateFilter(),
+			dep->GetPeriodRaw()
+		}));
 	}
 
 	dependencies->Sort();
