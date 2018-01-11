@@ -93,8 +93,7 @@ String ConfigPackageUtility::CreateStage(const String& packageName, const Dictio
 	bool foundDotDot = false;
 
 	if (files) {
-		ObjectLock olock(files);
-		for (const Dictionary::Pair& kv : files) {
+		for (const Dictionary::Pair& kv : files->GetView()) {
 			if (ContainsDotDot(kv.first)) {
 				foundDotDot = true;
 				break;

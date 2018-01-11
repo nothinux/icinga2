@@ -172,8 +172,7 @@ void ApiClient::ObjectsHttpCompletionCallback(HttpRequest& request,
 				Dictionary::Ptr attrs = objectInfo->Get("attrs");
 
 				if (attrs) {
-					ObjectLock olock(attrs);
-					for (const Dictionary::Pair& kv : attrs) {
+					for (const Dictionary::Pair& kv : attrs->GetView()) {
 						object->Attrs[object->Type.ToLower() + "." + kv.first] = kv.second;
 					}
 				}
@@ -181,13 +180,11 @@ void ApiClient::ObjectsHttpCompletionCallback(HttpRequest& request,
 				Dictionary::Ptr joins = objectInfo->Get("joins");
 
 				if (joins) {
-					ObjectLock olock(joins);
-					for (const Dictionary::Pair& kv : joins) {
+					for (const Dictionary::Pair& kv : joins->GetView()) {
 						Dictionary::Ptr attrs = kv.second;
 
 						if (attrs) {
-							ObjectLock olock(attrs);
-							for (const Dictionary::Pair& kv2 : attrs) {
+							for (const Dictionary::Pair& kv2 : attrs->GetView()) {
 								object->Attrs[kv.first + "." + kv2.first] = kv2.second;
 							}
 						}

@@ -72,8 +72,7 @@ static Array::Ptr DictionaryKeys()
 	ScriptFrame *vframe = ScriptFrame::GetCurrentFrame();
 	Dictionary::Ptr self = static_cast<Dictionary::Ptr>(vframe->Self);
 	ArrayData keys;
-	ObjectLock olock(self);
-	for (const Dictionary::Pair& kv : self) {
+	for (const Dictionary::Pair& kv : self->GetView()) {
 		keys.push_back(kv.first);
 	}
 	return new Array(std::move(keys));
@@ -84,8 +83,7 @@ static Array::Ptr DictionaryValues()
 	ScriptFrame *vframe = ScriptFrame::GetCurrentFrame();
 	Dictionary::Ptr self = static_cast<Dictionary::Ptr>(vframe->Self);
 	ArrayData values;
-	ObjectLock olock(self);
-	for (const Dictionary::Pair& kv : self) {
+	for (const Dictionary::Pair& kv : self->GetView()) {
 		values.push_back(kv.second);
 	}
 	return new Array(std::move(values));

@@ -1179,8 +1179,7 @@ void ClassCompiler::CodeGenValidator(const std::string& name, const std::string&
 						m_Impl << "\t\t" << "const Dictionary::Ptr& dict = value;" << std::endl;
 
 					m_Impl << (type_check ? "\t" : "") << "\t\t" << "{" << std::endl
-						<< (type_check ? "\t" : "") << "\t\t\t" << "ObjectLock olock(dict);" << std::endl
-						<< (type_check ? "\t" : "") << "\t\t\t" << "for (const Dictionary::Pair& kv : dict) {" << std::endl
+						<< (type_check ? "\t" : "") << "\t\t\t" << "for (const Dictionary::Pair& kv : dict->GetView()) {" << std::endl
 						<< (type_check ? "\t" : "") << "\t\t\t\t" << "const String& akey = kv.first;" << std::endl
 						<< (type_check ? "\t" : "") << "\t\t\t\t" << "const Value& avalue = kv.second;" << std::endl;
 					indent = true;
@@ -1439,7 +1438,6 @@ void ClassCompiler::CompileStream(const std::string& path, std::istream& input,
 		<< "#include <boost/signals2.hpp>" << std::endl << std::endl;
 
 	oimpl << "#include \"base/exception.hpp\"" << std::endl
-		<< "#include \"base/objectlock.hpp\"" << std::endl
 		<< "#include \"base/utility.hpp\"" << std::endl
 		<< "#include \"base/convert.hpp\"" << std::endl
 		<< "#include \"base/dependencygraph.hpp\"" << std::endl

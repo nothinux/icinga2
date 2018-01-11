@@ -178,9 +178,7 @@ void HttpRequest::FinishHeaders()
 				AddHeader("Host", RequestUrl->GetHost() + ":" + RequestUrl->GetPort());
 		}
 
-		ObjectLock olock(Headers);
-		for (const Dictionary::Pair& kv : Headers)
-		{
+		for (const Dictionary::Pair& kv : Headers->GetView()) {
 			String header = kv.first + ": " + kv.second + "\n";
 			m_Stream->Write(header.CStr(), header.GetLength());
 		}

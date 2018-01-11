@@ -228,8 +228,7 @@ static void AddSuggestions(std::vector<String>& matches, const String& word, con
 	if (value.IsObjectType<Dictionary>()) {
 		Dictionary::Ptr dict = value;
 
-		ObjectLock olock(dict);
-		for (const Dictionary::Pair& kv : dict) {
+		for (const Dictionary::Pair& kv : dict->GetView()) {
 			AddSuggestion(matches, word, prefix + kv.first);
 		}
 	}
@@ -248,8 +247,7 @@ static void AddSuggestions(std::vector<String>& matches, const String& word, con
 			Dictionary::Ptr dict = dynamic_pointer_cast<Dictionary>(prototype);
 
 			if (dict) {
-				ObjectLock olock(dict);
-				for (const Dictionary::Pair& kv : dict) {
+				for (const Dictionary::Pair& kv : dict->GetView()) {
 					AddSuggestion(matches, word, prefix + kv.first);
 				}
 			}
@@ -267,18 +265,12 @@ std::vector<String> ConsoleHandler::GetAutocompletionSuggestions(const String& w
 		AddSuggestion(matches, word, keyword);
 	}
 
-	{
-		ObjectLock olock(frame.Locals);
-		for (const Dictionary::Pair& kv : frame.Locals) {
-			AddSuggestion(matches, word, kv.first);
-		}
+	for (const Dictionary::Pair& kv : frame.Locals->GetView()) {
+		AddSuggestion(matches, word, kv.first);
 	}
 
-	{
-		ObjectLock olock(ScriptGlobal::GetGlobals());
-		for (const Dictionary::Pair& kv : ScriptGlobal::GetGlobals()) {
-			AddSuggestion(matches, word, kv.first);
-		}
+	for (const Dictionary::Pair& kv : ScriptGlobal::GetGlobals()->GetView()) {
+		AddSuggestion(matches, word, kv.first);
 	}
 
 	{

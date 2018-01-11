@@ -885,19 +885,16 @@ bool IdoMysqlConnection::CanExecuteQuery(const DbQuery& query)
 		return false;
 
 	if (query.WhereCriteria) {
-		ObjectLock olock(query.WhereCriteria);
 		Value value;
 
-		for (const Dictionary::Pair& kv : query.WhereCriteria) {
+		for (const Dictionary::Pair& kv : query.WhereCriteria->GetView()) {
 			if (!FieldToEscapedString(kv.first, kv.second, &value))
 				return false;
 		}
 	}
 
 	if (query.Fields) {
-		ObjectLock olock(query.Fields);
-
-		for (const Dictionary::Pair& kv : query.Fields) {
+		for (const Dictionary::Pair& kv : query.Fields->GetView()) {
 			Value value;
 
 			if (kv.second.IsEmpty() && !kv.second.IsString())
@@ -977,11 +974,10 @@ void IdoMysqlConnection::InternalExecuteQuery(const DbQuery& query, int typeOver
 	if (query.WhereCriteria) {
 		where << " WHERE ";
 
-		ObjectLock olock(query.WhereCriteria);
 		Value value;
 		bool first = true;
 
-		for (const Dictionary::Pair& kv : query.WhereCriteria) {
+		for (const Dictionary::Pair& kv : query.WhereCriteria->GetView()) {
 			if (!FieldToEscapedString(kv.first, kv.second, &value)) {
 
 #ifdef I2_DEBUG /* I2_DEBUG */
@@ -1052,10 +1048,8 @@ void IdoMysqlConnection::InternalExecuteQuery(const DbQuery& query, int typeOver
 		if (type == DbQueryUpdate && query.Fields->GetLength() == 0)
 			return;
 
-		ObjectLock olock(query.Fields);
-
 		bool first = true;
-		for (const Dictionary::Pair& kv : query.Fields) {
+		for (const Dictionary::Pair& kv : query.Fields->GetView()) {
 			Value value;
 
 			if (kv.second.IsEmpty() && !kv.second.IsString())

@@ -194,11 +194,14 @@ ConfigObject::Ptr ConfigItem::Commit(bool discard)
 	dobj->SetPackage(m_Package);
 	dobj->SetName(m_Name);
 
+	ScriptFrame frame(false, dobj);
+	if (m_Scope)
+		frame.Locals = m_Scope->ShallowClone();
+	else
+		frame.Locals = new Dictionary();
+
 	DebugHint debugHints;
 
-	ScriptFrame frame(true, dobj);
-	if (m_Scope)
-		m_Scope->CopyTo(frame.Locals);
 	try {
 		m_Expression->Evaluate(frame, &debugHints);
 	} catch (const std::exception& ex) {

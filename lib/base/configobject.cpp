@@ -176,8 +176,7 @@ void ConfigObject::ModifyAttribute(const String& attr, const Value& value, bool 
 
 			if (oldValue.IsObjectType<Dictionary>()) {
 				Dictionary::Ptr oldDict = oldValue;
-				ObjectLock olock(oldDict);
-				for (const auto& kv : oldDict) {
+				for (const auto& kv : oldDict->GetView()) {
 					String key = prefix + "." + kv.first;
 					if (!original_attributes->Contains(key))
 						original_attributes->Set(key, kv.second);
@@ -186,8 +185,7 @@ void ConfigObject::ModifyAttribute(const String& attr, const Value& value, bool 
 				/* store the new value as null */
 				if (value.IsObjectType<Dictionary>()) {
 					Dictionary::Ptr valueDict = value;
-					ObjectLock olock(valueDict);
-					for (const auto& kv : valueDict) {
+					for (const auto& kv : valueDict->GetView()) {
 						String key = attr + "." + kv.first;
 						if (!original_attributes->Contains(key))
 							original_attributes->Set(key, Empty);
@@ -276,49 +274,46 @@ void ConfigObject::RestoreAttribute(const String& attr, bool updateVersion)
 
 		std::vector<String> restoredAttrs;
 
-		{
-			ObjectLock olock(original_attributes);
-			for (const auto& kv : original_attributes) {
-				std::vector<String> originalTokens;
-				boost::algorithm::split(originalTokens, kv.first, boost::is_any_of("."));
+		for (const auto& kv : original_attributes->GetView()) {
+			std::vector<String> originalTokens;
+			boost::algorithm::split(originalTokens, kv.first, boost::is_any_of("."));
 
-				if (tokens.size() > originalTokens.size())
-					continue;
+			if (tokens.size() > originalTokens.size())
+				continue;
 
-				bool match = true;
-				for (std::vector<String>::size_type i = 0; i < tokens.size(); i++) {
-					if (tokens[i] != originalTokens[i]) {
-						match = false;
-						break;
-					}
+			bool match = true;
+			for (std::vector<String>::size_type i = 0; i < tokens.size(); i++) {
+				if (tokens[i] != originalTokens[i]) {
+					match = false;
+					break;
 				}
-
-				if (!match)
-					continue;
-
-				Dictionary::Ptr dict;
-
-				if (tokens.size() == originalTokens.size())
-					dict = current;
-				else {
-					Value currentSub = current;
-
-					for (std::vector<String>::size_type i = tokens.size() - 1; i < originalTokens.size() - 1; i++) {
-						dict = currentSub;
-						currentSub = dict->Get(originalTokens[i]);
-
-						if (!currentSub.IsObjectType<Dictionary>()) {
-							currentSub = new Dictionary();
-							dict->Set(originalTokens[i], currentSub);
-						}
-					}
-
-					dict = currentSub;
-				}
-
-				dict->Set(originalTokens[originalTokens.size() - 1], kv.second);
-				restoredAttrs.push_back(kv.first);
 			}
+
+			if (!match)
+				continue;
+
+			Dictionary::Ptr dict;
+
+			if (tokens.size() == originalTokens.size())
+				dict = current;
+			else {
+				Value currentSub = current;
+
+				for (std::vector<String>::size_type i = tokens.size() - 1; i < originalTokens.size() - 1; i++) {
+					dict = currentSub;
+					currentSub = dict->Get(originalTokens[i]);
+
+					if (!currentSub.IsObjectType<Dictionary>()) {
+						currentSub = new Dictionary();
+						dict->Set(originalTokens[i], currentSub);
+					}
+				}
+
+				dict = currentSub;
+			}
+
+			dict->Set(originalTokens[originalTokens.size() - 1], kv.second);
+			restoredAttrs.push_back(kv.first);
 		}
 
 		for (const String& attr : restoredAttrs)
@@ -648,8 +643,7 @@ void ConfigObject::DumpModifiedAttributes(const std::function<void(const ConfigO
 			if (!originalAttributes)
 				continue;
 
-			ObjectLock olock(originalAttributes);
-			for (const Dictionary::Pair& kv : originalAttributes) {
+			for (const Dictionary::Pair& kv : originalAttributes->GetView()) {
 				String key = kv.first;
 
 				Type::Ptr type = object->GetReflectionType();

@@ -29,23 +29,35 @@ template class std::map<String, Value>;
 
 REGISTER_PRIMITIVE_TYPE(Dictionary, Object, Dictionary::GetPrototype());
 
-Dictionary::Dictionary(const DictionaryData& other)
-{
-	for (const auto& kv : other)
-		m_Data.emplace(kv);
-}
+static boost::shared_ptr<DictionaryData> EmptyDictionaryData = boost::make_shared<DictionaryData>();
 
-Dictionary::Dictionary(DictionaryData&& other)
-{
-	for (auto& kv : other)
-		m_Data.emplace(std::move(kv));
-}
-
-Dictionary::Dictionary(std::initializer_list<Dictionary::Pair> init)
-	: m_Data(init)
+Dictionary::Dictionary()
+	: m_Data(EmptyDictionaryData)
 { }
 
-/**
+Dictionary::Dictionary(DictionaryData data)
+{
+	std::sort(data.begin(), data.end(), [](const Dictionary::Pair& a, const Dictionary::Pair& b) {
+		return a.first < b.first;
+	});
+
+	data.erase(std::unique(data.begin(), data.end(), [](const Dictionary::Pair& a, const Dictionary::Pair& b) {
+		return a.first == b.first;
+	}), data.end());
+
+	m_Data = boost::make_shared<DictionaryData>(std::move(data));
+}
+
+Dictionary::Dictionary(std::initializer_list<Pair> init)
+	: Dictionary(DictionaryData(init))
+{ }
+
+bool Dictionary::KeyLessComparer(const Pair& a, const String& b)
+{
+	return a.first < b;
+}
+
+/*
  * Retrieves a value from a dictionary.
  *
  * @param key The key whose value should be retrieved.
@@ -53,14 +65,16 @@ Dictionary::Dictionary(std::initializer_list<Dictionary::Pair> init)
  */
 Value Dictionary::Get(const String& key) const
 {
-	ObjectLock olock(this);
+	auto data = GetView();
 
-	auto it = m_Data.find(key);
+	auto end = data->end();
 
-	if (it == m_Data.end())
+	auto it = std::lower_bound(data->begin(), end, key, KeyLessComparer);
+
+	if (it == end || it->first != key)
 		return Empty;
-
-	return it->second;
+	else
+		return it->second;
 }
 
 /**
@@ -72,12 +86,15 @@ Value Dictionary::Get(const String& key) const
  */
 bool Dictionary::Get(const String& key, Value *result) const
 {
-	ObjectLock olock(this);
+	auto data = GetView();
 
-	auto it = m_Data.find(key);
+	auto end = data->end();
 
-	if (it == m_Data.end())
+	auto it = std::lower_bound(data->begin(), end, key, KeyLessComparer);
+
+	if (it == end || it->first != key)
 		return false;
+
 
 	*result = it->second;
 	return true;
@@ -91,9 +108,16 @@ bool Dictionary::Get(const String& key, Value *result) const
  */
 void Dictionary::Set(const String& key, Value value)
 {
-	ObjectLock olock(this);
+	m_Data.copy_update([&key, &value](DictionaryData *data) {
+		auto end = data->end();
 
-	m_Data[key] = std::move(value);
+		auto it = std::lower_bound(data->begin(), end, key, KeyLessComparer);
+
+		if (it != end && it->first == key)
+			it->second = value;
+		else
+			data->emplace(it, key, value);
+	});
 }
 
 /**
@@ -103,9 +127,9 @@ void Dictionary::Set(const String& key, Value value)
  */
 size_t Dictionary::GetLength() const
 {
-	ObjectLock olock(this);
+	auto data = GetView();
 
-	return m_Data.size();
+	return data->size();
 }
 
 /**
@@ -116,49 +140,18 @@ size_t Dictionary::GetLength() const
  */
 bool Dictionary::Contains(const String& key) const
 {
-	ObjectLock olock(this);
+	auto data = GetView();
 
-	return (m_Data.find(key) != m_Data.end());
+	auto end = data->end();
+
+	auto it = std::lower_bound(data->begin(), end, key, KeyLessComparer);
+
+	return (it != end && it->first == key);
 }
 
-/**
- * Returns an iterator to the beginning of the dictionary.
- *
- * Note: Caller must hold the object lock while using the iterator.
- *
- * @returns An iterator.
- */
-Dictionary::Iterator Dictionary::Begin()
+DictionaryView Dictionary::GetView() const
 {
-	ASSERT(OwnsLock());
-
-	return m_Data.begin();
-}
-
-/**
- * Returns an iterator to the end of the dictionary.
- *
- * Note: Caller must hold the object lock while using the iterator.
- *
- * @returns An iterator.
- */
-Dictionary::Iterator Dictionary::End()
-{
-	ASSERT(OwnsLock());
-
-	return m_Data.end();
-}
-
-/**
- * Removes the item specified by the iterator from the dictionary.
- *
- * @param it The iterator.
- */
-void Dictionary::Remove(Dictionary::Iterator it)
-{
-	ASSERT(OwnsLock());
-
-	m_Data.erase(it);
+	return m_Data.read();
 }
 
 /**
@@ -168,15 +161,14 @@ void Dictionary::Remove(Dictionary::Iterator it)
  */
 void Dictionary::Remove(const String& key)
 {
-	ObjectLock olock(this);
+	m_Data.copy_update([&key](DictionaryData *data) {
+		auto end = data->end();
 
-	Dictionary::Iterator it;
-	it = m_Data.find(key);
+		auto it = std::lower_bound(data->begin(), end, key, KeyLessComparer);
 
-	if (it == m_Data.end())
-		return;
-
-	m_Data.erase(it);
+		if (it != end && it->first == key)
+			data->erase(it);
+	});
 }
 
 /**
@@ -184,16 +176,12 @@ void Dictionary::Remove(const String& key)
  */
 void Dictionary::Clear()
 {
-	ObjectLock olock(this);
-
-	m_Data.clear();
+	m_Data = boost::make_shared<DictionaryData>();
 }
 
 void Dictionary::CopyTo(const Dictionary::Ptr& dest) const
 {
-	ObjectLock olock(this);
-
-	for (const Dictionary::Pair& kv : m_Data) {
+	for (const Dictionary::Pair& kv : GetView()) {
 		dest->Set(kv.first, kv.second);
 	}
 }
@@ -205,9 +193,7 @@ void Dictionary::CopyTo(const Dictionary::Ptr& dest) const
  */
 Dictionary::Ptr Dictionary::ShallowClone() const
 {
-	Dictionary::Ptr clone = new Dictionary();
-	CopyTo(clone);
-	return clone;
+	return new Dictionary(*GetView());
 }
 
 /**
@@ -218,19 +204,17 @@ Dictionary::Ptr Dictionary::ShallowClone() const
  */
 Object::Ptr Dictionary::Clone() const
 {
-	DictionaryData dict;
+	auto data = GetView();
 
-	{
-		ObjectLock olock(this);
+	DictionaryData result;
 
-		dict.reserve(GetLength());
+	result.reserve(data->size());
 
-		for (const Dictionary::Pair& kv : m_Data) {
-			dict.emplace_back(kv.first, kv.second.Clone());
-		}
+	for (const Dictionary::Pair& kv : GetView()) {
+		result.emplace_back(kv.first, kv.second.Clone());
 	}
 
-	return new Dictionary(std::move(dict));
+	return new Dictionary(std::move(result));
 }
 
 /**
@@ -241,11 +225,9 @@ Object::Ptr Dictionary::Clone() const
  */
 std::vector<String> Dictionary::GetKeys() const
 {
-	ObjectLock olock(this);
-
 	std::vector<String> keys;
 
-	for (const Dictionary::Pair& kv : m_Data) {
+	for (const Dictionary::Pair& kv : GetView()) {
 		keys.push_back(kv.first);
 	}
 
@@ -284,13 +266,13 @@ bool Dictionary::GetOwnField(const String& field, Value *result) const
 	return Get(field, result);
 }
 
-Dictionary::Iterator icinga::begin(const Dictionary::Ptr& x)
+Dictionary::ConstIterator icinga::begin(const DictionaryView& x)
 {
-	return x->Begin();
+	return x->begin();
 }
 
-Dictionary::Iterator icinga::end(const Dictionary::Ptr& x)
+Dictionary::ConstIterator icinga::end(const DictionaryView& x)
 {
-	return x->End();
+	return x->end();
 }
 

@@ -67,9 +67,7 @@ Value MacroProcessor::ResolveMacros(const Value& str, const ResolverList& resolv
 		Dictionary::Ptr resultDict = new Dictionary();
 		Dictionary::Ptr dict = str;
 
-		ObjectLock olock(dict);
-
-		for (const Dictionary::Pair& kv : dict) {
+		for (const Dictionary::Pair& kv : dict->GetView()) {
 			/* Note: don't escape macros here. */
 			resultDict->Set(kv.first, InternalResolveMacros(kv.second, resolvers, cr, missingMacro,
 				EscapeCallback(), resolvedMacros, useResolvedMacros, recursionLevel + 1));
@@ -348,16 +346,14 @@ void MacroProcessor::ValidateCustomVars(const ConfigObject::Ptr& object, const D
 		return;
 
 	/* string, array, dictionary */
-	ObjectLock olock(value);
-	for (const Dictionary::Pair& kv : value) {
+	for (const Dictionary::Pair& kv : value->GetView()) {
 		const Value& varval = kv.second;
 
 		if (varval.IsObjectType<Dictionary>()) {
-			/* only one dictonary level */
+			/* only one dictionary level */
 			Dictionary::Ptr varval_dict = varval;
 
-			ObjectLock xlock(varval_dict);
-			for (const Dictionary::Pair& kv_var : varval_dict) {
+			for (const Dictionary::Pair& kv_var : varval_dict->GetView()) {
 				if (!kv_var.second.IsString())
 					continue;
 
@@ -445,8 +441,7 @@ Value MacroProcessor::ResolveArguments(const Value& command, const Dictionary::P
 	if (arguments) {
 		std::vector<CommandArgument> args;
 
-		ObjectLock olock(arguments);
-		for (const Dictionary::Pair& kv : arguments) {
+		for (const Dictionary::Pair& kv : arguments->GetView()) {
 			const Value& arginfo = kv.second;
 
 			CommandArgument arg;

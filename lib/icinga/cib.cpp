@@ -270,9 +270,7 @@ std::pair<Dictionary::Ptr, Array::Ptr> CIB::GetFeatureStats()
 	Dictionary::Ptr statsFunctions = ScriptGlobal::Get("StatsFunctions", &Empty);
 
 	if (statsFunctions) {
-		ObjectLock olock(statsFunctions);
-
-		for (const Dictionary::Pair& kv : statsFunctions)
+		for (const Dictionary::Pair& kv : statsFunctions->GetView())
 			static_cast<Function::Ptr>(kv.second)->Invoke({ status, perfdata });
 	}
 

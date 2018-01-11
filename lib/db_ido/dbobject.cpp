@@ -88,14 +88,10 @@ String DbObject::CalculateConfigHash(const Dictionary::Ptr& configFields) const
 {
 	Dictionary::Ptr configFieldsDup = configFields->ShallowClone();
 
-	{
-		ObjectLock olock(configFieldsDup);
-
-		for (const Dictionary::Pair& kv : configFieldsDup) {
-			if (kv.second.IsObjectType<ConfigObject>()) {
-				ConfigObject::Ptr obj = kv.second;
-				configFieldsDup->Set(kv.first, obj->GetName());
-			}
+	for (const Dictionary::Pair& kv : configFieldsDup->GetView()) {
+		if (kv.second.IsObjectType<ConfigObject>()) {
+			ConfigObject::Ptr obj = kv.second;
+			configFieldsDup->Set(kv.first, obj->GetName());
 		}
 	}
 
@@ -234,9 +230,7 @@ void DbObject::SendVarsConfigUpdateHeavy()
 	Dictionary::Ptr vars = custom_var_object->GetVars();
 
 	if (vars) {
-		ObjectLock olock (vars);
-
-		for (const Dictionary::Pair& kv : vars) {
+		for (const Dictionary::Pair& kv : vars->GetView()) {
 			if (kv.first.IsEmpty())
 				continue;
 
@@ -281,9 +275,8 @@ void DbObject::SendVarsStatusUpdate()
 
 	if (vars) {
 		std::vector<DbQuery> queries;
-		ObjectLock olock (vars);
 
-		for (const Dictionary::Pair& kv : vars) {
+		for (const Dictionary::Pair& kv : vars->GetView()) {
 			if (kv.first.IsEmpty())
 				continue;
 

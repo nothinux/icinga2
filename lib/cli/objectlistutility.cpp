@@ -75,8 +75,7 @@ void ObjectListUtility::PrintProperties(std::ostream& fp, const Dictionary::Ptr&
 
 	int offset = 2;
 
-	ObjectLock olock(props);
-	for (const Dictionary::Pair& kv : props)
+	for (const Dictionary::Pair& kv : props->GetView())
 	{
 		String key = kv.first;
 		Value val = kv.second;

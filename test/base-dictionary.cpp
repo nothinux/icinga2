@@ -76,11 +76,9 @@ BOOST_AUTO_TEST_CASE(foreach)
 	dictionary->Set("test1", 7);
 	dictionary->Set("test2", "hello world");
 
-	ObjectLock olock(dictionary);
-
 	bool seen_test1 = false, seen_test2 = false;
 
-	for (const Dictionary::Pair& kv : dictionary) {
+	for (const Dictionary::Pair& kv : dictionary->GetView()) {
 		BOOST_CHECK(kv.first == "test1" || kv.first == "test2");
 
 		if (kv.first == "test1") {
@@ -126,18 +124,6 @@ BOOST_AUTO_TEST_CASE(remove)
 
 	BOOST_CHECK(!dictionary->Contains("test2"));
 	BOOST_CHECK(dictionary->GetLength() == 0);
-
-	dictionary->Set("test1", 7);
-	dictionary->Set("test2", "hello world");
-
-	{
-		ObjectLock olock(dictionary);
-
-		auto it = dictionary->Begin();
-		dictionary->Remove(it);
-	}
-
-	BOOST_CHECK(dictionary->GetLength() == 1);
 }
 
 BOOST_AUTO_TEST_CASE(clone)

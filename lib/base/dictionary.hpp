@@ -23,6 +23,7 @@
 #include "base/i2-base.hpp"
 #include "base/object.hpp"
 #include "base/value.hpp"
+#include "base/rcu_ptr.hpp"
 #include <boost/range/iterator.hpp>
 #include <map>
 #include <vector>
@@ -30,7 +31,9 @@
 namespace icinga
 {
 
-typedef std::vector<std::pair<String, Value> > DictionaryData;
+using DictionaryPair = std::pair<String, Value>;
+using DictionaryData = std::vector<DictionaryPair>;
+using DictionaryView = boost::shared_ptr<const DictionaryData>;
 
 /**
  * A container that holds key-value pairs.
@@ -45,15 +48,14 @@ public:
 	/**
 	 * An iterator that can be used to iterate over dictionary elements.
 	 */
-	typedef std::map<String, Value>::iterator Iterator;
+	typedef DictionaryData::const_iterator ConstIterator;
 
-	typedef std::map<String, Value>::size_type SizeType;
+	typedef DictionaryData::size_type SizeType;
 
-	typedef std::map<String, Value>::value_type Pair;
+	typedef DictionaryPair Pair;
 
-	Dictionary() = default;
-	Dictionary(const DictionaryData& other);
-	Dictionary(DictionaryData&& other);
+	Dictionary();
+	Dictionary(DictionaryData other);
 	Dictionary(std::initializer_list<Pair> init);
 
 	Value Get(const String& key) const;
@@ -61,14 +63,14 @@ public:
 	void Set(const String& key, Value value);
 	bool Contains(const String& key) const;
 
-	Iterator Begin();
-	Iterator End();
+	DictionaryView GetView() const;
+
+	ConstIterator Begin();
+	ConstIterator End();
 
 	size_t GetLength() const;
 
 	void Remove(const String& key);
-
-	void Remove(Iterator it);
 
 	void Clear();
 
@@ -89,11 +91,13 @@ public:
 	bool GetOwnField(const String& field, Value *result) const override;
 
 private:
-	std::map<String, Value> m_Data; /**< The data for the dictionary. */
+	rcu_ptr<DictionaryData> m_Data; /**< The data for the dictionary. */
+
+	static bool KeyLessComparer(const Pair& a, const String& b);
 };
 
-Dictionary::Iterator begin(const Dictionary::Ptr& x);
-Dictionary::Iterator end(const Dictionary::Ptr& x);
+Dictionary::ConstIterator begin(const DictionaryView& x);
+Dictionary::ConstIterator end(const DictionaryView& x);
 
 }
 

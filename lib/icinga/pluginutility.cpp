@@ -68,8 +68,7 @@ void PluginUtility::ExecuteCommand(const Command::Ptr& commandObj, const Checkab
 	Dictionary::Ptr env = commandObj->GetEnv();
 
 	if (env) {
-		ObjectLock olock(env);
-		for (const Dictionary::Pair& kv : env) {
+		for (const Dictionary::Pair& kv : env->GetView()) {
 			String name = kv.second;
 
 			Value value = MacroProcessor::ResolveMacros(name, macroResolvers, cr,

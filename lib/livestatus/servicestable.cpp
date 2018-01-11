@@ -1063,8 +1063,7 @@ Value ServicesTable::CustomVariableNamesAccessor(const Value& row)
 	ArrayData result;
 
 	if (vars) {
-		ObjectLock olock(vars);
-		for (const Dictionary::Pair& kv : vars) {
+		for (const Dictionary::Pair& kv : vars->GetView()) {
 			result.push_back(kv.first);
 		}
 	}
@@ -1084,8 +1083,7 @@ Value ServicesTable::CustomVariableValuesAccessor(const Value& row)
 	ArrayData result;
 
 	if (vars) {
-		ObjectLock olock(vars);
-		for (const Dictionary::Pair& kv : vars) {
+		for (const Dictionary::Pair& kv : vars->GetView()) {
 			if (kv.second.IsObjectType<Array>() || kv.second.IsObjectType<Dictionary>())
 				result.push_back(JsonEncode(kv.second));
 			else
@@ -1108,8 +1106,7 @@ Value ServicesTable::CustomVariablesAccessor(const Value& row)
 	ArrayData result;
 
 	if (vars) {
-		ObjectLock olock(vars);
-		for (const Dictionary::Pair& kv : vars) {
+		for (const Dictionary::Pair& kv : vars->GetView()) {
 			Value val;
 
 			if (kv.second.IsObjectType<Array>() || kv.second.IsObjectType<Dictionary>())
@@ -1141,8 +1138,7 @@ Value ServicesTable::CVIsJsonAccessor(const Value& row)
 
 	bool cv_is_json = false;
 
-	ObjectLock olock(vars);
-	for (const Dictionary::Pair& kv : vars) {
+	for (const Dictionary::Pair& kv : vars->GetView()) {
 		if (kv.second.IsObjectType<Array>() || kv.second.IsObjectType<Dictionary>())
 			cv_is_json = true;
 	}

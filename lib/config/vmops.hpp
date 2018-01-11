@@ -209,18 +209,10 @@ public:
 				BOOST_THROW_EXCEPTION(ScriptError("Cannot use array iterator for dictionary.", debugInfo));
 
 			Dictionary::Ptr dict = value;
-			std::vector<String> keys;
 
-			{
-				ObjectLock olock(dict);
-				for (const Dictionary::Pair& kv : dict) {
-					keys.push_back(kv.first);
-				}
-			}
-
-			for (const String& key : keys) {
-				frame.Locals->Set(fkvar, key);
-				frame.Locals->Set(fvvar, dict->Get(key));
+			for (const Dictionary::Pair& kv : dict->GetView()) {
+				frame.Locals->Set(fkvar, kv.first);
+				frame.Locals->Set(fvvar, kv.second);
 				ExpressionResult res = expression->Evaluate(frame);
 				CHECK_RESULT_LOOP(res);
 			}

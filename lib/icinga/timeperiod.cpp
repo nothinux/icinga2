@@ -383,8 +383,7 @@ void TimePeriod::ValidateRanges(const Lazy<Dictionary::Ptr>& lvalue, const Valid
 	tm reference = Utility::LocalTime(refts);
 	Array::Ptr segments = new Array();
 
-	ObjectLock olock(lvalue());
-	for (const Dictionary::Pair& kv : lvalue()) {
+	for (const Dictionary::Pair& kv : lvalue()->GetView()) {
 		try {
 			tm begin_tm, end_tm;
 			int stride;

@@ -104,8 +104,7 @@ Value CommandsTable::CustomVariableNamesAccessor(const Value& row)
 	ArrayData keys;
 
 	if (vars) {
-		ObjectLock xlock(vars);
-		for (const auto& kv : vars) {
+		for (const auto& kv : vars->GetView()) {
 			keys.push_back(kv.first);
 		}
 	}
@@ -125,8 +124,7 @@ Value CommandsTable::CustomVariableValuesAccessor(const Value& row)
 	ArrayData keys;
 
 	if (vars) {
-		ObjectLock xlock(vars);
-		for (const auto& kv : vars) {
+		for (const auto& kv : vars->GetView()) {
 			keys.push_back(kv.second);
 		}
 	}
@@ -146,8 +144,7 @@ Value CommandsTable::CustomVariablesAccessor(const Value& row)
 	ArrayData result;
 
 	if (vars) {
-		ObjectLock xlock(vars);
-		for (const auto& kv : vars) {
+		for (const auto& kv : vars->GetView()) {
 			result.push_back(new Array({
 				kv.first,
 				kv.second

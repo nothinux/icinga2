@@ -236,8 +236,7 @@ Value StatusTable::CustomVariableNamesAccessor(const Value&)
 	ArrayData result;
 
 	if (vars) {
-		ObjectLock olock(vars);
-		for (const auto& kv : vars) {
+		for (const auto& kv : vars->GetView()) {
 			result.push_back(kv.first);
 		}
 	}
@@ -252,8 +251,7 @@ Value StatusTable::CustomVariableValuesAccessor(const Value&)
 	ArrayData result;
 
 	if (vars) {
-		ObjectLock olock(vars);
-		for (const auto& kv : vars) {
+		for (const auto& kv : vars->GetView()) {
 			result.push_back(kv.second);
 		}
 	}
@@ -268,8 +266,7 @@ Value StatusTable::CustomVariablesAccessor(const Value&)
 	ArrayData result;
 
 	if (vars) {
-		ObjectLock olock(vars);
-		for (const auto& kv : vars) {
+		for (const auto& kv : vars->GetView()) {
 			result.push_back(new Array({
 				kv.first,
 				kv.second

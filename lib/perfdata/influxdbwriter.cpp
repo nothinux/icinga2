@@ -223,8 +223,7 @@ void InfluxdbWriter::CheckResultHandlerWQ(const Checkable::Ptr& checkable, const
 
 	Dictionary::Ptr tags = tmpl->Get("tags");
 	if (tags) {
-		ObjectLock olock(tags);
-		for (const Dictionary::Pair& pair : tags) {
+		for (const Dictionary::Pair& pair : tags->GetView()) {
 			String missing_macro;
 			Value value = MacroProcessor::ResolveMacros(pair.second, resolvers, cr, &missing_macro);
 
@@ -330,8 +329,7 @@ void InfluxdbWriter::SendMetric(const Dictionary::Ptr& tmpl, const String& label
 
 	Dictionary::Ptr tags = tmpl->Get("tags");
 	if (tags) {
-		ObjectLock olock(tags);
-		for (const Dictionary::Pair& pair : tags) {
+		for (const Dictionary::Pair& pair : tags->GetView()) {
 			// Empty macro expansion, no tag
 			if (!pair.second.IsEmpty()) {
 				msgbuf << "," << EscapeKeyOrTagValue(pair.first) << "=" << EscapeKeyOrTagValue(pair.second);
@@ -345,18 +343,15 @@ void InfluxdbWriter::SendMetric(const Dictionary::Ptr& tmpl, const String& label
 
 	msgbuf << " ";
 
-	{
-		bool first = true;
+	bool first = true;
 
-		ObjectLock fieldLock(fields);
-		for (const Dictionary::Pair& pair : fields) {
-			if (first)
-				first = false;
-			else
-				msgbuf << ",";
+	for (const Dictionary::Pair& pair : fields->GetView()) {
+		if (first)
+			first = false;
+		else
+			msgbuf << ",";
 
-			msgbuf << EscapeKeyOrTagValue(pair.first) << "=" << EscapeValue(pair.second);
-		}
+		msgbuf << EscapeKeyOrTagValue(pair.first) << "=" << EscapeValue(pair.second);
 	}
 
 	msgbuf << " " <<  static_cast<unsigned long>(ts);
@@ -502,8 +497,7 @@ void InfluxdbWriter::ValidateHostTemplate(const Lazy<Dictionary::Ptr>& lvalue, c
 
 	Dictionary::Ptr tags = lvalue()->Get("tags");
 	if (tags) {
-		ObjectLock olock(tags);
-		for (const Dictionary::Pair& pair : tags) {
+		for (const Dictionary::Pair& pair : tags->GetView()) {
 			if (!MacroProcessor::ValidateMacroString(pair.second))
 				BOOST_THROW_EXCEPTION(ValidationError(this, { "host_template", "tags", pair.first }, "Closing $ not found in macro format string '" + pair.second));
 		}
@@ -520,8 +514,7 @@ void InfluxdbWriter::ValidateServiceTemplate(const Lazy<Dictionary::Ptr>& lvalue
 
 	Dictionary::Ptr tags = lvalue()->Get("tags");
 	if (tags) {
-		ObjectLock olock(tags);
-		for (const Dictionary::Pair& pair : tags) {
+		for (const Dictionary::Pair& pair : tags->GetView()) {
 			if (!MacroProcessor::ValidateMacroString(pair.second))
 				BOOST_THROW_EXCEPTION(ValidationError(this, { "service_template", "tags", pair.first }, "Closing $ not found in macro format string '" + pair.second));
 		}

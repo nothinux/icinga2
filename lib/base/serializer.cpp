@@ -43,11 +43,11 @@ static Dictionary::Ptr SerializeDictionary(const Dictionary::Ptr& input, int att
 {
 	DictionaryData result;
 
-	result.reserve(input->GetLength());
+	auto data = input->GetView();
 
-	ObjectLock olock(input);
+	result.reserve(data->size());
 
-	for (const Dictionary::Pair& kv : input) {
+	for (const Dictionary::Pair& kv : data) {
 		result.emplace_back(kv.first, Serialize(kv.second, attributeTypes));
 	}
 
@@ -100,11 +100,11 @@ static Dictionary::Ptr DeserializeDictionary(const Dictionary::Ptr& input, bool 
 {
 	DictionaryData result;
 
-	result.reserve(input->GetLength());
+	auto data = input->GetView();
 
-	ObjectLock olock(input);
+	result.reserve(data->size());
 
-	for (const Dictionary::Pair& kv : input) {
+	for (const Dictionary::Pair& kv : data) {
 		result.emplace_back(kv.first, Deserialize(kv.second, safe_mode, attributeTypes));
 	}
 
@@ -133,8 +133,7 @@ static Object::Ptr DeserializeObject(const Object::Ptr& object, const Dictionary
 	else
 		instance = type->Instantiate(std::vector<Value>());
 
-	ObjectLock olock(input);
-	for (const Dictionary::Pair& kv : input) {
+	for (const Dictionary::Pair& kv : input->GetView()) {
 		if (kv.first.IsEmpty())
 			continue;
 

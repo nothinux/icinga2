@@ -122,10 +122,8 @@ static Value ProcessSpawnImpl(struct msghdr *msgh, const Dictionary::Ptr& reques
 		envp[i] = strdup(environ[i]);
 
 	if (extraEnvironment) {
-		ObjectLock olock(extraEnvironment);
-
 		int index = envc;
-		for (const Dictionary::Pair& kv : extraEnvironment) {
+		for (const Dictionary::Pair& kv : extraEnvironment->GetView()) {
 			String skv = kv.first + "=" + Convert::ToString(kv.second);
 			envp[index] = strdup(skv.CStr());
 			index++;
@@ -896,9 +894,7 @@ void Process::Run(const std::function<void(const ProcessResult&)>& callback)
 	FreeEnvironmentStrings(pEnvironment);
 
 	if (m_ExtraEnvironment) {
-		ObjectLock olock(m_ExtraEnvironment);
-
-		for (const Dictionary::Pair& kv : m_ExtraEnvironment) {
+		for (const Dictionary::Pair& kv : m_ExtraEnvironment->GetView()) {
 			String skv = kv.first + "=" + Convert::ToString(kv.second);
 
 			envp = static_cast<char *>(realloc(envp, offset + skv.GetLength() + 1));

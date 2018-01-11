@@ -469,8 +469,7 @@ Array::Ptr LegacyTimePeriod::ScriptFunc(const TimePeriod::Ptr& tp, double begin,
 				<< "Checking reference time " << refts;
 #endif /* I2_DEBUG */
 
-			ObjectLock olock(ranges);
-			for (const Dictionary::Pair& kv : ranges) {
+			for (const Dictionary::Pair& kv : ranges->GetView()) {
 				if (!IsInDayDefinition(kv.first, &reference)) {
 #ifdef I2_DEBUG
 					Log(LogDebug, "LegacyTimePeriod")

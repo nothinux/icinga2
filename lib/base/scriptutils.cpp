@@ -380,8 +380,7 @@ Array::Ptr ScriptUtils::Keys(const Dictionary::Ptr& dict)
 	ArrayData result;
 
 	if (dict) {
-		ObjectLock olock(dict);
-		for (const Dictionary::Pair& kv : dict) {
+		for (const Dictionary::Pair& kv : dict->GetView()) {
 			result.push_back(kv.first);
 		}
 	}

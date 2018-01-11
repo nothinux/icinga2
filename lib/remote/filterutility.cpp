@@ -258,8 +258,7 @@ std::vector<Value> FilterUtility::GetFilterTargets(const QueryDescription& qd, c
 
 		Dictionary::Ptr filter_vars = query->Get("filter_vars");
 		if (filter_vars) {
-			ObjectLock olock(filter_vars);
-			for (const Dictionary::Pair& kv : filter_vars) {
+			for (const Dictionary::Pair& kv : filter_vars->GetView()) {
 				uvars->Set(kv.first, kv.second);
 			}
 		}

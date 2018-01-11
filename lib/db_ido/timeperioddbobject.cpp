@@ -67,8 +67,7 @@ void TimePeriodDbObject::OnConfigUpdateHeavy()
 		return;
 
 	time_t refts = Utility::GetTime();
-	ObjectLock olock(ranges);
-	for (const Dictionary::Pair& kv : ranges) {
+	for (const Dictionary::Pair& kv : ranges->GetView()) {
 		int wday = LegacyTimePeriod::WeekdayFromString(kv.first);
 
 		if (wday == -1)
