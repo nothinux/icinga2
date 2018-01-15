@@ -84,14 +84,14 @@ Dictionary::Ptr ServiceDbObject::GetConfigFields() const
 	unsigned long notificationStateFilter = CompatUtility::GetCheckableNotificationTypeFilter(service);
 	unsigned long notificationTypeFilter = CompatUtility::GetCheckableNotificationTypeFilter(service);
 
-	fields->Set("notify_on_warning", notificationStateFilter & ServiceWarning);
-	fields->Set("notify_on_unknown", notificationStateFilter & ServiceUnknown);
-	fields->Set("notify_on_critical", notificationStateFilter & ServiceCritical);
-	fields->Set("notify_on_recovery", notificationTypeFilter & NotificationRecovery);
-	fields->Set("notify_on_flapping", (notificationTypeFilter & NotificationFlappingStart) ||
-		(notificationTypeFilter & NotificationFlappingEnd));
-	fields->Set("notify_on_downtime", (notificationTypeFilter & NotificationDowntimeStart) ||
-		(notificationTypeFilter & NotificationDowntimeEnd) || (notificationTypeFilter & NotificationDowntimeRemoved));
+	fields->Set("notify_on_warning", (notificationStateFilter & ServiceWarning) ? 1 : 0);
+	fields->Set("notify_on_unknown", (notificationStateFilter & ServiceUnknown) ? 1 : 0);
+	fields->Set("notify_on_critical", (notificationStateFilter & ServiceCritical) ? 1 : 0);
+	fields->Set("notify_on_recovery", (notificationTypeFilter & NotificationRecovery) ? 1 : 0);
+	fields->Set("notify_on_flapping", ((notificationTypeFilter & NotificationFlappingStart) ||
+		(notificationTypeFilter & NotificationFlappingEnd)) ? 1 : 0);
+	fields->Set("notify_on_downtime", ((notificationTypeFilter & NotificationDowntimeStart) ||
+		(notificationTypeFilter & NotificationDowntimeEnd) || (notificationTypeFilter & NotificationDowntimeRemoved)) ? 1 : 0);
 
 	return fields;
 }
@@ -235,10 +235,10 @@ void ServiceDbObject::OnConfigUpdateHeavy()
 		fields1->Set("dependent_service_object_id", service);
 		fields1->Set("inherits_parent", 1);
 		fields1->Set("timeperiod_object_id", dep->GetPeriod());
-		fields1->Set("fail_on_ok", stateFilter & StateFilterOK);
-		fields1->Set("fail_on_warning", stateFilter & StateFilterWarning);
-		fields1->Set("fail_on_critical", stateFilter & StateFilterCritical);
-		fields1->Set("fail_on_unknown", stateFilter & StateFilterUnknown);
+		fields1->Set("fail_on_ok", (stateFilter & StateFilterOK) ? 1 : 0);
+		fields1->Set("fail_on_warning", (stateFilter & StateFilterWarning) ? 1 : 0);
+		fields1->Set("fail_on_critical", (stateFilter & StateFilterCritical) ? 1 :0);
+		fields1->Set("fail_on_unknown", (stateFilter & StateFilterUnknown) ? 1 : 0);
 		fields1->Set("instance_id", 0); /* DbConnection class fills in real ID */
 
 		DbQuery query1;

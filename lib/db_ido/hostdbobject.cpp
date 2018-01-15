@@ -86,13 +86,13 @@ Dictionary::Ptr HostDbObject::GetConfigFields() const
 	unsigned long notificationStateFilter = CompatUtility::GetCheckableNotificationTypeFilter(host);
 	unsigned long notificationTypeFilter = CompatUtility::GetCheckableNotificationTypeFilter(host);
 
-	fields->Set("notify_on_down", (notificationStateFilter & ServiceWarning) || (notificationStateFilter && ServiceCritical));
+	fields->Set("notify_on_down", ((notificationStateFilter & ServiceWarning) || (notificationStateFilter && ServiceCritical)) ? 1 : 0);
 	fields->Set("notify_on_unreachable", 1); /* We don't have this filter and state, and as such we don't filter such notifications. */
-	fields->Set("notify_on_recovery", notificationTypeFilter & NotificationRecovery);
-	fields->Set("notify_on_flapping", (notificationTypeFilter & NotificationFlappingStart) ||
-		(notificationTypeFilter & NotificationFlappingEnd));
-	fields->Set("notify_on_downtime", (notificationTypeFilter & NotificationDowntimeStart) ||
-		(notificationTypeFilter & NotificationDowntimeEnd) || (notificationTypeFilter & NotificationDowntimeRemoved));
+	fields->Set("notify_on_recovery", (notificationTypeFilter & NotificationRecovery) ? 1 : 0);
+	fields->Set("notify_on_flapping", ((notificationTypeFilter & NotificationFlappingStart) ||
+		(notificationTypeFilter & NotificationFlappingEnd)) ? 1 : 0);
+	fields->Set("notify_on_downtime", ((notificationTypeFilter & NotificationDowntimeStart) ||
+		(notificationTypeFilter & NotificationDowntimeEnd) || (notificationTypeFilter & NotificationDowntimeRemoved)) ? 1 : 0);
 
 	return fields;
 }
@@ -276,8 +276,8 @@ void HostDbObject::OnConfigUpdateHeavy()
 		fields2->Set("dependent_host_object_id", host);
 		fields2->Set("inherits_parent", 1);
 		fields2->Set("timeperiod_object_id", dep->GetPeriod());
-		fields2->Set("fail_on_up", stateFilter & StateFilterUp);
-		fields2->Set("fail_on_down", stateFilter & StateFilterDown);
+		fields2->Set("fail_on_up", (stateFilter & StateFilterUp) ? 1 : 0);
+		fields2->Set("fail_on_down", (stateFilter & StateFilterDown) ? 1 : 0);
 		fields2->Set("instance_id", 0); /* DbConnection class fills in real ID */
 
 		DbQuery query2;
