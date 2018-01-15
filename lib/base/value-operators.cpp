@@ -289,11 +289,9 @@ Value icinga::operator-(const Value& lhs, const Value& rhs)
 		Array::Ptr left = lhs;
 		Array::Ptr right = rhs;
 
-		ObjectLock olock(left);
-		for (const Value& lv : left) {
+		for (const Value& lv : left->GetView()) {
 			bool found = false;
-			ObjectLock xlock(right);
-			for (const Value& rv : right) {
+			for (const Value& rv : right->GetView()) {
 				if (lv == rv) {
 					found = true;
 					break;
@@ -577,15 +575,15 @@ bool icinga::operator<(const Value& lhs, const Value& rhs)
 		Array::Ptr larr = lhs;
 		Array::Ptr rarr = rhs;
 
-		ObjectLock llock(larr);
-		ObjectLock rlock(rarr);
+		auto vlarr = larr->GetView();
+		auto vrarr = rarr->GetView();
 
-		Array::SizeType llen = larr->GetLength();
-		Array::SizeType rlen = rarr->GetLength();
+		Array::SizeType llen = vlarr->size();
+		Array::SizeType rlen = vrarr->size();
 
 		for (Array::SizeType i = 0; i < std::max(llen, rlen); i++) {
-			Value lval = (i >= llen) ? Empty : larr->Get(i);
-			Value rval = (i >= rlen) ? Empty : rarr->Get(i);
+			const Value& lval = (i >= llen) ? Empty : vlarr->at(i);
+			const Value& rval = (i >= rlen) ? Empty : vrarr->at(i);
 
 			if (lval < rval)
 				return true;
@@ -630,15 +628,15 @@ bool icinga::operator>(const Value& lhs, const Value& rhs)
 		Array::Ptr larr = lhs;
 		Array::Ptr rarr = rhs;
 
-		ObjectLock llock(larr);
-		ObjectLock rlock(rarr);
+		auto vlarr = larr->GetView();
+		auto vrarr = rarr->GetView();
 
-		Array::SizeType llen = larr->GetLength();
-		Array::SizeType rlen = rarr->GetLength();
+		Array::SizeType llen = vlarr->size();
+		Array::SizeType rlen = vrarr->size();
 
 		for (Array::SizeType i = 0; i < std::max(llen, rlen); i++) {
-			Value lval = (i >= llen) ? Empty : larr->Get(i);
-			Value rval = (i >= rlen) ? Empty : rarr->Get(i);
+			const Value& lval = (i >= llen) ? Empty : vlarr->at(i);
+			const Value& rval = (i >= rlen) ? Empty : vrarr->at(i);
 
 			if (lval > rval)
 				return true;

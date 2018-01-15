@@ -129,9 +129,10 @@ static void PersistModAttrHelper(std::fstream& fp, ConfigObject::Ptr& previousOb
 
 		ConfigWriter::EmitRaw(fp, "var obj = ");
 
-		Array::Ptr args1 = new Array();
-		args1->Add(object->GetReflectionType()->GetName());
-		args1->Add(object->GetName());
+		Array::Ptr args1 = new Array({
+			object->GetReflectionType()->GetName(),
+			object->GetName()
+		});
 		ConfigWriter::EmitFunctionCall(fp, "get_object", args1);
 
 		ConfigWriter::EmitRaw(fp, "\nif (obj) {\n");
@@ -139,9 +140,10 @@ static void PersistModAttrHelper(std::fstream& fp, ConfigObject::Ptr& previousOb
 
 	ConfigWriter::EmitRaw(fp, "\tobj.");
 
-	Array::Ptr args2 = new Array();
-	args2->Add(attr);
-	args2->Add(value);
+	Array::Ptr args2 = new Array({
+		attr,
+		value
+	});
 	ConfigWriter::EmitFunctionCall(fp, "modify_attribute", args2);
 
 	ConfigWriter::EmitRaw(fp, "\n");
@@ -289,7 +291,7 @@ String IcingaApplication::GetNodeName() const
 	return ScriptGlobal::Get("NodeName");
 }
 
-void IcingaApplication::ValidateVars(const Dictionary::Ptr& value, const ValidationUtils& utils)
+void IcingaApplication::ValidateVars(const Lazy<Dictionary::Ptr>& lvalue, const ValidationUtils& utils)
 {
-	MacroProcessor::ValidateCustomVars(this, value);
+	MacroProcessor::ValidateCustomVars(this, lvalue());
 }

@@ -240,8 +240,7 @@ void GraphiteWriter::SendPerfdata(const String& prefix, const CheckResult::Ptr& 
 	if (!perfdata)
 		return;
 
-	ObjectLock olock(perfdata);
-	for (const Value& val : perfdata) {
+	for (const Value& val : perfdata->GetView()) {
 		PerfdataValue::Ptr pdv;
 
 		if (val.IsObjectType<PerfdataValue>())
@@ -332,8 +331,7 @@ Value GraphiteWriter::EscapeMacroMetric(const Value& value)
 		Array::Ptr arr = value;
 		Array::Ptr result = new Array();
 
-		ObjectLock olock(arr);
-		for (const Value& arg : arr) {
+		for (const Value& arg : arr->GetView()) {
 			result->Add(EscapeMetric(arg));
 		}
 
@@ -342,18 +340,18 @@ Value GraphiteWriter::EscapeMacroMetric(const Value& value)
 		return EscapeMetric(value);
 }
 
-void GraphiteWriter::ValidateHostNameTemplate(const String& value, const ValidationUtils& utils)
+void GraphiteWriter::ValidateHostNameTemplate(const Lazy<String>& lvalue, const ValidationUtils& utils)
 {
-	ObjectImpl<GraphiteWriter>::ValidateHostNameTemplate(value, utils);
+	ObjectImpl<GraphiteWriter>::ValidateHostNameTemplate(lvalue, utils);
 
-	if (!MacroProcessor::ValidateMacroString(value))
-		BOOST_THROW_EXCEPTION(ValidationError(this, { "host_name_template" }, "Closing $ not found in macro format string '" + value + "'."));
+	if (!MacroProcessor::ValidateMacroString(lvalue()))
+		BOOST_THROW_EXCEPTION(ValidationError(this, { "host_name_template" }, "Closing $ not found in macro format string '" + lvalue() + "'."));
 }
 
-void GraphiteWriter::ValidateServiceNameTemplate(const String& value, const ValidationUtils& utils)
+void GraphiteWriter::ValidateServiceNameTemplate(const Lazy<String>& lvalue, const ValidationUtils& utils)
 {
-	ObjectImpl<GraphiteWriter>::ValidateServiceNameTemplate(value, utils);
+	ObjectImpl<GraphiteWriter>::ValidateServiceNameTemplate(lvalue, utils);
 
-	if (!MacroProcessor::ValidateMacroString(value))
-		BOOST_THROW_EXCEPTION(ValidationError(this, { "service_name_template" }, "Closing $ not found in macro format string '" + value + "'."));
+	if (!MacroProcessor::ValidateMacroString(lvalue()))
+		BOOST_THROW_EXCEPTION(ValidationError(this, { "service_name_template" }, "Closing $ not found in macro format string '" + lvalue() + "'."));
 }

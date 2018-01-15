@@ -41,8 +41,7 @@ String CompatUtility::GetCommandLine(const Command::Ptr& command)
 	if (commandLine.IsObjectType<Array>()) {
 		Array::Ptr args = commandLine;
 
-		ObjectLock olock(args);
-		for (const String& arg : args) {
+		for (const String& arg : args->GetView()) {
 			// This is obviously incorrect for non-trivial cases.
 			result += " \"" + EscapeString(arg) + "\"";
 		}
@@ -141,8 +140,7 @@ String CompatUtility::GetCheckableCommandArgs(const Checkable::Ptr& checkable)
 		Dictionary::Ptr command_vars = command->GetVars();
 
 		if (command_vars) {
-			ObjectLock olock(command_vars);
-			for (const Dictionary::Pair& kv : command_vars) {
+			for (const Dictionary::Pair& kv : command_vars->GetView()) {
 				String macro = "$" + kv.first + "$"; // this is too simple
 				if (command_line.Contains(macro))
 					args->Set(kv.first, kv.second);
@@ -153,8 +151,7 @@ String CompatUtility::GetCheckableCommandArgs(const Checkable::Ptr& checkable)
 		Dictionary::Ptr host_vars = host->GetVars();
 
 		if (host_vars) {
-			ObjectLock olock(host_vars);
-			for (const Dictionary::Pair& kv : host_vars) {
+			for (const Dictionary::Pair& kv : host_vars->GetView()) {
 				String macro = "$" + kv.first + "$"; // this is too simple
 				if (command_line.Contains(macro))
 					args->Set(kv.first, kv.second);
@@ -168,8 +165,7 @@ String CompatUtility::GetCheckableCommandArgs(const Checkable::Ptr& checkable)
 			Dictionary::Ptr service_vars = service->GetVars();
 
 			if (service_vars) {
-				ObjectLock olock(service_vars);
-				for (const Dictionary::Pair& kv : service_vars) {
+				for (const Dictionary::Pair& kv : service_vars->GetView()) {
 					String macro = "$" + kv.first + "$"; // this is too simple
 					if (command_line.Contains(macro))
 						args->Set(kv.first, kv.second);
@@ -181,8 +177,7 @@ String CompatUtility::GetCheckableCommandArgs(const Checkable::Ptr& checkable)
 		}
 
 		String arg_string;
-		ObjectLock olock(args);
-		for (const Dictionary::Pair& kv : args) {
+		for (const Dictionary::Pair& kv : args->GetView()) {
 			arg_string += Convert::ToString(kv.first) + "=" + Convert::ToString(kv.second) + "!";
 		}
 		return arg_string;

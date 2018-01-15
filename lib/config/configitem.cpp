@@ -194,11 +194,14 @@ ConfigObject::Ptr ConfigItem::Commit(bool discard)
 	dobj->SetPackage(m_Package);
 	dobj->SetName(m_Name);
 
+	ScriptFrame frame(false, dobj);
+	if (m_Scope)
+		frame.Locals = m_Scope->ShallowClone();
+	else
+		frame.Locals = new Dictionary();
+
 	DebugHint debugHints;
 
-	ScriptFrame frame(true, dobj);
-	if (m_Scope)
-		m_Scope->CopyTo(frame.Locals);
 	try {
 		m_Expression->Evaluate(frame, &debugHints);
 	} catch (const std::exception& ex) {
@@ -288,25 +291,24 @@ ConfigObject::Ptr ConfigItem::Commit(bool discard)
 		throw;
 	}
 
-	Dictionary::Ptr persistentItem = new Dictionary();
+	Dictionary::Ptr persistentItem = new Dictionary({
+		{ "type", GetType()->GetName() },
+		{ "name", GetName() },
+		{ "properties", Serialize(dobj, FAConfig) },
+		{ "debug_hints", dhint },
+		{ "debug_info", new Array({
+			m_DebugInfo.Path,
+			m_DebugInfo.FirstLine,
+			m_DebugInfo.FirstColumn,
+			m_DebugInfo.LastLine,
+			m_DebugInfo.LastColumn,
+		}) }
+	});
 
-	persistentItem->Set("type", GetType()->GetName());
-	persistentItem->Set("name", GetName());
-	persistentItem->Set("properties", Serialize(dobj, FAConfig));
-	persistentItem->Set("debug_hints", dhint);
-
-	Array::Ptr di = new Array();
-	di->Add(m_DebugInfo.Path);
-	di->Add(m_DebugInfo.FirstLine);
-	di->Add(m_DebugInfo.FirstColumn);
-	di->Add(m_DebugInfo.LastLine);
-	di->Add(m_DebugInfo.LastColumn);
-	persistentItem->Set("debug_info", di);
+	dhint.reset();
 
 	ConfigCompilerContext::GetInstance()->WriteObject(persistentItem);
 	persistentItem.reset();
-
-	dhint.reset();
 
 	dobj->Register();
 

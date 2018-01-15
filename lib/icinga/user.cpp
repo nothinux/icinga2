@@ -46,11 +46,7 @@ void User::OnAllConfigLoaded()
 	Array::Ptr groups = GetGroups();
 
 	if (groups) {
-		groups = groups->ShallowClone();
-
-		ObjectLock olock(groups);
-
-		for (const String& name : groups) {
+		for (const String& name : groups->GetView()) {
 			UserGroup::Ptr ug = UserGroup::GetByName(name);
 
 			if (ug)
@@ -66,9 +62,7 @@ void User::Stop(bool runtimeRemoved)
 	Array::Ptr groups = GetGroups();
 
 	if (groups) {
-		ObjectLock olock(groups);
-
-		for (const String& name : groups) {
+		for (const String& name : groups->GetView()) {
 			UserGroup::Ptr ug = UserGroup::GetByName(name);
 
 			if (ug)
@@ -97,21 +91,21 @@ TimePeriod::Ptr User::GetPeriod() const
 	return TimePeriod::GetByName(GetPeriodRaw());
 }
 
-void User::ValidateStates(const Array::Ptr& value, const ValidationUtils& utils)
+void User::ValidateStates(const Lazy<Array::Ptr>& lvalue, const ValidationUtils& utils)
 {
-	ObjectImpl<User>::ValidateStates(value, utils);
+	ObjectImpl<User>::ValidateStates(lvalue, utils);
 
-	int filter = FilterArrayToInt(value, Notification::GetStateFilterMap(), 0);
+	int filter = FilterArrayToInt(lvalue(), Notification::GetStateFilterMap(), 0);
 
 	if (filter == -1 || (filter & ~(StateFilterUp | StateFilterDown | StateFilterOK | StateFilterWarning | StateFilterCritical | StateFilterUnknown)) != 0)
 		BOOST_THROW_EXCEPTION(ValidationError(this, { "states" }, "State filter is invalid."));
 }
 
-void User::ValidateTypes(const Array::Ptr& value, const ValidationUtils& utils)
+void User::ValidateTypes(const Lazy<Array::Ptr>& lvalue, const ValidationUtils& utils)
 {
-	ObjectImpl<User>::ValidateTypes(value, utils);
+	ObjectImpl<User>::ValidateTypes(lvalue, utils);
 
-	int filter = FilterArrayToInt(value, Notification::GetTypeFilterMap(), 0);
+	int filter = FilterArrayToInt(lvalue(), Notification::GetTypeFilterMap(), 0);
 
 	if (filter == -1 || (filter & ~(NotificationDowntimeStart | NotificationDowntimeEnd | NotificationDowntimeRemoved |
 		NotificationCustom | NotificationAcknowledgement | NotificationProblem | NotificationRecovery |

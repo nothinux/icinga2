@@ -19,6 +19,7 @@
 
 #include "icinga-studio/mainform.hpp"
 #include "icinga-studio/aboutform.hpp"
+#include "base/objectlock.hpp"
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include <wx/msgdlg.h>
@@ -193,8 +194,7 @@ wxPGProperty *MainForm::ValueToProperty(const String& name, const Value& value)
 		Array::Ptr arr = value;
 
 		{
-			ObjectLock olock(arr);
-			for (const Value& aitem : arr) {
+			for (const Value& aitem : arr->GetView()) {
 				String val1 = aitem;
 				val.Add(val1.GetData());
 			}
@@ -208,12 +208,9 @@ wxPGProperty *MainForm::ValueToProperty(const String& name, const Value& value)
 
 		Dictionary::Ptr dict = value;
 
-		{
-			ObjectLock olock(dict);
-			for (const Dictionary::Pair& kv : dict) {
-				if (kv.first != "type")
-					prop->AppendChild(ValueToProperty(kv.first, kv.second));
-			}
+		for (const Dictionary::Pair& kv : dict->GetView()) {
+			if (kv.first != "type")
+				prop->AppendChild(ValueToProperty(kv.first, kv.second));
 		}
 
 		String type = "Dictionary";

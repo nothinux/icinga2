@@ -127,12 +127,10 @@ bool ScriptUtils::Regex(const std::vector<Value>& args)
 		texts = argTexts;
 
 	if (texts) {
-		ObjectLock olock(texts);
-
 		if (texts->GetLength() == 0)
 			return false;
 
-		for (const String& text : texts) {
+		for (const String& text : texts->GetView()) {
 			bool res = false;
 			try {
 				boost::smatch what;
@@ -175,12 +173,10 @@ bool ScriptUtils::Match(const std::vector<Value>& args)
 		texts = argTexts;
 
 	if (texts) {
-		ObjectLock olock(texts);
-
 		if (texts->GetLength() == 0)
 			return false;
 
-		for (const String& text : texts) {
+		for (const String& text : texts->GetView()) {
 			bool res = Utility::Match(pattern, text);
 
 			if (mode == MatchAny && res)
@@ -216,12 +212,10 @@ bool ScriptUtils::CidrMatch(const std::vector<Value>& args)
 		ips = argIps;
 
 	if (ips) {
-		ObjectLock olock(ips);
-
 		if (ips->GetLength() == 0)
 			return false;
 
-		for (const String& ip : ips) {
+		for (const String& ip : ips->GetView()) {
 			bool res = Utility::CidrMatch(pattern, ip);
 
 			if (mode == MatchAny && res)
@@ -260,19 +254,13 @@ Array::Ptr ScriptUtils::Union(const std::vector<Value>& arguments)
 		Array::Ptr arr = varr;
 
 		if (arr) {
-			ObjectLock olock(arr);
-			for (const Value& value : arr) {
+			for (const Value& value : arr->GetView()) {
 				values.insert(value);
 			}
 		}
 	}
 
-	Array::Ptr result = new Array();
-	for (const Value& value : values) {
-		result->Add(value);
-	}
-
-	return result;
+	return Array::FromSet(values);
 }
 
 Array::Ptr ScriptUtils::Intersection(const std::vector<Value>& arguments)
@@ -292,7 +280,7 @@ Array::Ptr ScriptUtils::Intersection(const std::vector<Value>& arguments)
 	for (std::vector<Value>::size_type i = 1; i < arguments.size(); i++) {
 		{
 			ObjectLock olock(arr1);
-			std::sort(arr1->Begin(), arr1->End());
+			//XXX:std::sort(arr1->Begin(), arr1->End());
 		}
 
 		Array::Ptr arg2 = arguments[i];
@@ -303,15 +291,15 @@ Array::Ptr ScriptUtils::Intersection(const std::vector<Value>& arguments)
 		Array::Ptr arr2 = arg2->ShallowClone();
 		{
 			ObjectLock olock(arr2);
-			std::sort(arr2->Begin(), arr2->End());
+			//XXX:std::sort(arr2->Begin(), arr2->End());
 		}
 
 		result->Resize(std::max(arr1->GetLength(), arr2->GetLength()));
 		Array::SizeType len;
 		{
 			ObjectLock olock(arr1), xlock(arr2), ylock(result);
-			auto it = std::set_intersection(arr1->Begin(), arr1->End(), arr2->Begin(), arr2->End(), result->Begin());
-			len = it - result->Begin();
+			//XXX:auto it = std::set_intersection(arr1->Begin(), arr1->End(), arr2->Begin(), arr2->End(), result->Begin());
+			len = 0;//len = it - result->Begin();
 		}
 		result->Resize(len);
 		arr1 = result;
@@ -370,16 +358,16 @@ Array::Ptr ScriptUtils::Range(const std::vector<Value>& arguments)
 			BOOST_THROW_EXCEPTION(std::invalid_argument("Invalid number of arguments for range()"));
 	}
 
-	Array::Ptr result = new Array();
+	ArrayData result;
 
 	if ((start < end && increment <= 0) ||
 		(start > end && increment >= 0))
-		return result;
+		return new Array();
 
 	for (double i = start; (increment > 0 ? i < end : i > end); i += increment)
-		result->Add(i);
+		result.push_back(i);
 
-	return result;
+	return new Array(std::move(result));
 }
 
 Type::Ptr ScriptUtils::TypeOf(const Value& value)
@@ -389,16 +377,15 @@ Type::Ptr ScriptUtils::TypeOf(const Value& value)
 
 Array::Ptr ScriptUtils::Keys(const Dictionary::Ptr& dict)
 {
-	Array::Ptr result = new Array();
+	ArrayData result;
 
 	if (dict) {
-		ObjectLock olock(dict);
-		for (const Dictionary::Pair& kv : dict) {
-			result->Add(kv.first);
+		for (const Dictionary::Pair& kv : dict->GetView()) {
+			result.push_back(kv.first);
 		}
 	}
 
-	return result;
+	return new Array(std::move(result));
 }
 
 ConfigObject::Ptr ScriptUtils::GetObject(const Value& vtype, const String& name)
@@ -428,12 +415,12 @@ Array::Ptr ScriptUtils::GetObjects(const Type::Ptr& type)
 	if (!ctype)
 		BOOST_THROW_EXCEPTION(std::invalid_argument("Invalid type: Type must inherit from 'ConfigObject'"));
 
-	Array::Ptr result = new Array();
+	ArrayData result;
 
 	for (const ConfigObject::Ptr& object : ctype->GetObjects())
-		result->Add(object);
+		result.push_back(object);
 
-	return result;
+	return new Array(std::move(result));
 }
 
 void ScriptUtils::Assert(const Value& arg)

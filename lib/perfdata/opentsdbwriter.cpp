@@ -167,8 +167,7 @@ void OpenTsdbWriter::SendPerfdata(const String& metric, const std::map<String, S
 	if (!perfdata)
 		return;
 
-	ObjectLock olock(perfdata);
-	for (const Value& val : perfdata) {
+	for (const Value& val : perfdata->GetView()) {
 		PerfdataValue::Ptr pdv;
 
 		if (val.IsObjectType<PerfdataValue>())

@@ -143,8 +143,7 @@ void FilterUtility::CheckPermission(const ApiUser::Ptr& user, const String& perm
 
 	Array::Ptr permissions = user->GetPermissions();
 	if (permissions) {
-		ObjectLock olock(permissions);
-		for (const Value& item : permissions) {
+		for (const Value& item : permissions->GetView()) {
 			String permission;
 			Function::Ptr filter;
 			if (item.IsObjectType<Dictionary>()) {
@@ -222,8 +221,7 @@ std::vector<Value> FilterUtility::GetFilterTargets(const QueryDescription& qd, c
 		if (query->Contains(attr)) {
 			Array::Ptr names = query->Get(attr);
 			if (names) {
-				ObjectLock olock(names);
-				for (const String& name : names) {
+				for (const String& name : names->GetView()) {
 					Object::Ptr target = provider->GetTargetByName(type, name);
 
 					if (!FilterUtility::EvaluateFilter(permissionFrame, permissionFilter, target, variableName))
@@ -260,8 +258,7 @@ std::vector<Value> FilterUtility::GetFilterTargets(const QueryDescription& qd, c
 
 		Dictionary::Ptr filter_vars = query->Get("filter_vars");
 		if (filter_vars) {
-			ObjectLock olock(filter_vars);
-			for (const Dictionary::Pair& kv : filter_vars) {
+			for (const Dictionary::Pair& kv : filter_vars->GetView()) {
 				uvars->Set(kv.first, kv.second);
 			}
 		}

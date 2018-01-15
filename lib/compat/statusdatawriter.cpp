@@ -138,8 +138,7 @@ void StatusDataWriter::DumpTimePeriod(std::ostream& fp, const TimePeriod::Ptr& t
 	Dictionary::Ptr ranges = tp->GetRanges();
 
 	if (ranges) {
-		ObjectLock olock(ranges);
-		for (const Dictionary::Pair& kv : ranges) {
+		for (const Dictionary::Pair& kv : ranges->GetView()) {
 			fp << "\t" << kv.first << "\t" << kv.second << "\n";
 		}
 	}
@@ -303,9 +302,7 @@ void StatusDataWriter::DumpHostObject(std::ostream& fp, const Host::Ptr& host)
 	Array::Ptr groups = host->GetGroups();
 
 	if (groups) {
-		ObjectLock olock(groups);
-
-		for (const String& name : groups) {
+		for (const String& name : groups->GetView()) {
 			HostGroup::Ptr hg = HostGroup::GetByName(name);
 
 			if (hg) {
@@ -486,9 +483,7 @@ void StatusDataWriter::DumpServiceObject(std::ostream& fp, const Service::Ptr& s
 	Array::Ptr groups = service->GetGroups();
 
 	if (groups) {
-		ObjectLock olock(groups);
-
-		for (const String& name : groups) {
+		for (const String& name : groups->GetView()) {
 			ServiceGroup::Ptr sg = ServiceGroup::GetByName(name);
 
 			if (sg) {
@@ -518,8 +513,7 @@ void StatusDataWriter::DumpCustomAttributes(std::ostream& fp, const CustomVarObj
 
 	bool is_json = false;
 
-	ObjectLock olock(vars);
-	for (const Dictionary::Pair& kv : vars) {
+	for (const Dictionary::Pair& kv : vars->GetView()) {
 		if (kv.first.IsEmpty())
 			continue;
 

@@ -68,8 +68,7 @@ void PluginUtility::ExecuteCommand(const Command::Ptr& commandObj, const Checkab
 	Dictionary::Ptr env = commandObj->GetEnv();
 
 	if (env) {
-		ObjectLock olock(env);
-		for (const Dictionary::Pair& kv : env) {
+		for (const Dictionary::Pair& kv : env->GetView()) {
 			String name = kv.second;
 
 			Value value = MacroProcessor::ResolveMacros(name, macroResolvers, cr,
@@ -200,10 +199,8 @@ String PluginUtility::FormatPerfdata(const Array::Ptr& perfdata)
 
 	std::ostringstream result;
 
-	ObjectLock olock(perfdata);
-
 	bool first = true;
-	for (const Value& pdv : perfdata) {
+	for (const Value& pdv : perfdata->GetView()) {
 		if (!first)
 			result << " ";
 		else

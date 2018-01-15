@@ -29,9 +29,9 @@ using namespace icinga;
 
 REGISTER_TYPE(CustomVarObject);
 
-void CustomVarObject::ValidateVars(const Dictionary::Ptr& value, const ValidationUtils& utils)
+void CustomVarObject::ValidateVars(const Lazy<Dictionary::Ptr>& lvalue, const ValidationUtils& utils)
 {
-	MacroProcessor::ValidateCustomVars(this, value);
+	MacroProcessor::ValidateCustomVars(this, lvalue());
 }
 
 int icinga::FilterArrayToInt(const Array::Ptr& typeFilters, const std::map<String, int>& filterMap, int defaultValue)
@@ -43,8 +43,7 @@ int icinga::FilterArrayToInt(const Array::Ptr& typeFilters, const std::map<Strin
 
 	resultTypeFilter = 0;
 
-	ObjectLock olock(typeFilters);
-	for (const Value& typeFilter : typeFilters) {
+	for (const Value& typeFilter : typeFilters->GetView()) {
 		if (typeFilter.IsNumber()) {
 			resultTypeFilter = resultTypeFilter | typeFilter;
 			continue;

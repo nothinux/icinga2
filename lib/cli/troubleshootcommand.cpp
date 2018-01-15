@@ -513,8 +513,7 @@ void TroubleshootCommand::CheckObjectFile(const String& objectfile, InfoLog& log
 			Dictionary::Ptr debug_hints = object->Get("debug_hints");
 			Dictionary::Ptr properties = object->Get("properties");
 
-			ObjectLock olock(properties);
-			for (const Dictionary::Pair& kv : properties) {
+			for (const Dictionary::Pair& kv : properties->GetView()) {
 				if (Utility::Match(kv.first, "path"))
 					logs->Set(name, kv.second);
 			}
@@ -572,8 +571,7 @@ void TroubleshootCommand::PrintLoggers(InfoLog& log, Dictionary::Ptr& logs)
 		InfoLogLine(log)
 			<< "Getting the last 20 lines of " << logs->GetLength() << " FileLogger objects.\n";
 
-		ObjectLock ulock(logs);
-		for (const Dictionary::Pair& kv : logs) {
+		for (const Dictionary::Pair& kv : logs->GetView()) {
 			InfoLogLine(log)
 				<< "Logger " << kv.first << " at path: " << kv.second << '\n';
 

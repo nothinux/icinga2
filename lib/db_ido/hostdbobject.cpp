@@ -194,8 +194,7 @@ void HostDbObject::OnConfigUpdateHeavy()
 	queries.emplace_back(std::move(query1));
 
 	if (groups) {
-		ObjectLock olock(groups);
-		for (const String& groupName : groups) {
+		for (const String& groupName : groups->GetView()) {
 			HostGroup::Ptr group = HostGroup::GetByName(groupName);
 
 			DbQuery query2;
@@ -391,7 +390,7 @@ String HostDbObject::CalculateConfigHash(const Dictionary::Ptr& configFields) co
 	if (groups)
 		hashData += DbObject::HashValue(groups);
 
-	Array::Ptr parents = new Array();
+	ArrayData parents;
 
 	/* parents */
 	for (const Checkable::Ptr& checkable : host->GetParents()) {
@@ -400,12 +399,12 @@ String HostDbObject::CalculateConfigHash(const Dictionary::Ptr& configFields) co
 		if (!parent)
 			continue;
 
-		parents->Add(parent->GetName());
+		parents.push_back(parent->GetName());
 	}
 
-	parents->Sort();
+	std::sort(parents.begin(), parents.end());
 
-	hashData += DbObject::HashValue(parents);
+	hashData += DbObject::HashValue(new Array(std::move(parents)));
 
 	Array::Ptr dependencies = new Array();
 
@@ -416,10 +415,11 @@ String HostDbObject::CalculateConfigHash(const Dictionary::Ptr& configFields) co
 		if (!parent)
 			continue;
 
-		Array::Ptr depInfo = new Array();
-		depInfo->Add(parent->GetName());
-		depInfo->Add(dep->GetStateFilter());
-		depInfo->Add(dep->GetPeriodRaw());
+		Array::Ptr depInfo = new Array({
+			parent->GetName(),
+			dep->GetStateFilter(),
+			dep->GetPeriodRaw()
+		});
 
 		dependencies->Add(depInfo);
 	}

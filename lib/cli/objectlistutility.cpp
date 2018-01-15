@@ -75,8 +75,7 @@ void ObjectListUtility::PrintProperties(std::ostream& fp, const Dictionary::Ptr&
 
 	int offset = 2;
 
-	ObjectLock olock(props);
-	for (const Dictionary::Pair& kv : props)
+	for (const Dictionary::Pair& kv : props->GetView())
 	{
 		String key = kv.first;
 		Value val = kv.second;
@@ -111,9 +110,7 @@ void ObjectListUtility::PrintHints(std::ostream& fp, const Dictionary::Ptr& debu
 	Array::Ptr messages = debug_hints->Get("messages");
 
 	if (messages) {
-		ObjectLock olock(messages);
-
-		for (const Value& msg : messages)
+		for (const Value& msg : messages->GetView())
 		{
 			PrintHint(fp, msg, indent);
 		}
@@ -153,9 +150,7 @@ void ObjectListUtility::PrintArray(std::ostream& fp, const Array::Ptr& arr)
 	fp << "[ ";
 
 	if (arr) {
-		ObjectLock olock(arr);
-		for (const Value& value : arr)
-		{
+		for (const Value& value : arr->GetView()) {
 			if (first)
 				first = false;
 			else

@@ -24,6 +24,7 @@
 #include "base/application.hpp"
 #include "base/tlsutility.hpp"
 #include "base/json.hpp"
+#include "base/objectlock.hpp"
 #include <iostream>
 
 using namespace icinga;
@@ -61,12 +62,10 @@ int CAListCommand::Run(const boost::program_options::variables_map& vm, const st
 	if (vm.count("json"))
 		std::cout << JsonEncode(requests);
 	else {
-		ObjectLock olock(requests);
-
 		std::cout << "Fingerprint                                                      | Timestamp                | Signed | Subject\n";
 		std::cout << "-----------------------------------------------------------------|--------------------------|--------|--------\n";
 
-		for (auto& kv : requests) {
+		for (auto& kv : requests->GetView()) {
 			Dictionary::Ptr request = kv.second;
 
 			std::cout << kv.first

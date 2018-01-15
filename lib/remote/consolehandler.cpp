@@ -122,7 +122,7 @@ bool ConsoleHandler::ExecuteScriptHelper(HttpRequest& request, HttpResponse& res
 	lsf.Lines[fileName] = command;
 
 	Array::Ptr results = new Array();
-	Dictionary::Ptr resultInfo = new Dictionary();
+	Dictionary::Ptr resultInfo;
 	std::unique_ptr<Expression> expr;
 	Value exprResult;
 
@@ -136,9 +136,11 @@ bool ConsoleHandler::ExecuteScriptHelper(HttpRequest& request, HttpResponse& res
 
 		exprResult = expr->Evaluate(frame);
 
-		resultInfo->Set("code", 200);
-		resultInfo->Set("status", "Executed successfully.");
-		resultInfo->Set("result", Serialize(exprResult, 0));
+		resultInfo = new Dictionary({
+			{ "code", 200 },
+			{ "status", "Executed successfully." },
+			{ "result", Serialize(exprResult, 0) }
+		});
 	} catch (const ScriptError& ex) {
 		DebugInfo di = ex.GetDebugInfo();
 
@@ -149,23 +151,25 @@ bool ConsoleHandler::ExecuteScriptHelper(HttpRequest& request, HttpResponse& res
 			<< String(di.FirstColumn, ' ') << String(di.LastColumn - di.FirstColumn + 1, '^') << "\n"
 			<< ex.what() << "\n";
 
-		resultInfo->Set("code", 500);
-		resultInfo->Set("status", String(msgbuf.str()));
-		resultInfo->Set("incomplete_expression", ex.IsIncompleteExpression());
-
-		Dictionary::Ptr debugInfo = new Dictionary();
-		debugInfo->Set("path", di.Path);
-		debugInfo->Set("first_line", di.FirstLine);
-		debugInfo->Set("first_column", di.FirstColumn);
-		debugInfo->Set("last_line", di.LastLine);
-		debugInfo->Set("last_column", di.LastColumn);
-		resultInfo->Set("debug_info", debugInfo);
+		resultInfo = new Dictionary({
+			{ "code", 500 },
+			{ "status", String(msgbuf.str()) },
+			{ "incomplete_expression", ex.IsIncompleteExpression() },
+			{ "debug_info", new Dictionary({
+				{ "path", di.Path },
+				{ "first_line", di.FirstLine },
+				{ "first_column", di.FirstColumn },
+				{ "last_line", di.LastLine },
+				{ "last_column", di.LastColumn }
+			}) }
+		});
 	}
 
 	results->Add(resultInfo);
 
-	Dictionary::Ptr result = new Dictionary();
-	result->Set("results", results);
+	Dictionary::Ptr result = new Dictionary({
+		{ "results", results }
+	});
 
 	response.SetStatus(200, "OK");
 	HttpUtility::SendJsonBody(response, params, result);
@@ -228,8 +232,7 @@ static void AddSuggestions(std::vector<String>& matches, const String& word, con
 	if (value.IsObjectType<Dictionary>()) {
 		Dictionary::Ptr dict = value;
 
-		ObjectLock olock(dict);
-		for (const Dictionary::Pair& kv : dict) {
+		for (const Dictionary::Pair& kv : dict->GetView()) {
 			AddSuggestion(matches, word, prefix + kv.first);
 		}
 	}
@@ -248,8 +251,7 @@ static void AddSuggestions(std::vector<String>& matches, const String& word, con
 			Dictionary::Ptr dict = dynamic_pointer_cast<Dictionary>(prototype);
 
 			if (dict) {
-				ObjectLock olock(dict);
-				for (const Dictionary::Pair& kv : dict) {
+				for (const Dictionary::Pair& kv : dict->GetView()) {
 					AddSuggestion(matches, word, prefix + kv.first);
 				}
 			}
@@ -267,24 +269,17 @@ std::vector<String> ConsoleHandler::GetAutocompletionSuggestions(const String& w
 		AddSuggestion(matches, word, keyword);
 	}
 
-	{
-		ObjectLock olock(frame.Locals);
-		for (const Dictionary::Pair& kv : frame.Locals) {
-			AddSuggestion(matches, word, kv.first);
-		}
+	for (const Dictionary::Pair& kv : frame.Locals->GetView()) {
+		AddSuggestion(matches, word, kv.first);
 	}
 
-	{
-		ObjectLock olock(ScriptGlobal::GetGlobals());
-		for (const Dictionary::Pair& kv : ScriptGlobal::GetGlobals()) {
-			AddSuggestion(matches, word, kv.first);
-		}
+	for (const Dictionary::Pair& kv : ScriptGlobal::GetGlobals()->GetView()) {
+		AddSuggestion(matches, word, kv.first);
 	}
 
 	{
 		Array::Ptr imports = ScriptFrame::GetImports();
-		ObjectLock olock(imports);
-		for (const Value& import : imports) {
+		for (const Value& import : imports->GetView()) {
 			AddSuggestions(matches, word, "", false, import);
 		}
 	}

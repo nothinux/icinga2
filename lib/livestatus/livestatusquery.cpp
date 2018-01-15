@@ -378,8 +378,7 @@ void LivestatusQuery::AppendResultRow(std::ostream& fp, const Array::Ptr& row, b
 	if (m_OutputFormat == "csv") {
 		bool first = true;
 
-		ObjectLock rlock(row);
-		for (const Value& value : row) {
+		for (const Value& value : row->GetView()) {
 			if (first)
 				first = false;
 			else
@@ -411,8 +410,7 @@ void LivestatusQuery::PrintCsvArray(std::ostream& fp, const Array::Ptr& array, i
 {
 	bool first = true;
 
-	ObjectLock olock(array);
-	for (const Value& value : array) {
+	for (const Value& value : array->GetView()) {
 		if (first)
 			first = false;
 		else
@@ -433,7 +431,7 @@ void LivestatusQuery::PrintPythonArray(std::ostream& fp, const Array::Ptr& rs) c
 
 	bool first = true;
 
-	for (const Value& value : rs) {
+	for (const Value& value : rs->GetView()) {
 		if (first)
 			first = false;
 		else

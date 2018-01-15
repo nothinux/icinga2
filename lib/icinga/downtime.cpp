@@ -260,8 +260,7 @@ String Downtime::AddDowntime(const Checkable::Ptr& checkable, const String& auth
 	Array::Ptr errors = new Array();
 
 	if (!ConfigObjectUtility::CreateObject(Downtime::TypeInstance, fullName, config, errors)) {
-		ObjectLock olock(errors);
-		for (const String& error : errors) {
+		for (const String& error : errors->GetView()) {
 			Log(LogCritical, "Downtime", error);
 		}
 
@@ -272,6 +271,7 @@ String Downtime::AddDowntime(const Checkable::Ptr& checkable, const String& auth
 		Downtime::Ptr parentDowntime = Downtime::GetByName(triggeredBy);
 		Array::Ptr triggers = parentDowntime->GetTriggers();
 
+		//XXX:rcu
 		ObjectLock olock(triggers);
 		if (!triggers->Contains(fullName))
 			triggers->Add(fullName);
@@ -313,8 +313,7 @@ void Downtime::RemoveDowntime(const String& id, bool cancelled, bool expired, co
 	Array::Ptr errors = new Array();
 
 	if (!ConfigObjectUtility::DeleteObject(downtime, false, errors)) {
-		ObjectLock olock(errors);
-		for (const String& error : errors) {
+		for (const String& error : errors->GetView()) {
 			Log(LogCritical, "Downtime", error);
 		}
 
@@ -351,16 +350,13 @@ void Downtime::TriggerDowntime()
 
 	Array::Ptr triggers = GetTriggers();
 
-	{
-		ObjectLock olock(triggers);
-		for (const String& triggerName : triggers) {
-			Downtime::Ptr downtime = Downtime::GetByName(triggerName);
+	for (const String& triggerName : triggers->GetView()) {
+		Downtime::Ptr downtime = Downtime::GetByName(triggerName);
 
-			if (!downtime)
-				continue;
+		if (!downtime)
+			continue;
 
-			downtime->TriggerDowntime();
-		}
+		downtime->TriggerDowntime();
 	}
 
 	OnDowntimeTriggered(this);
@@ -409,18 +405,18 @@ void Downtime::DowntimesExpireTimerHandler()
 	}
 }
 
-void Downtime::ValidateStartTime(const Timestamp& value, const ValidationUtils& utils)
+void Downtime::ValidateStartTime(const Lazy<Timestamp>& lvalue, const ValidationUtils& utils)
 {
-	ObjectImpl<Downtime>::ValidateStartTime(value, utils);
+	ObjectImpl<Downtime>::ValidateStartTime(lvalue, utils);
 
-	if (value <= 0)
+	if (lvalue() <= 0)
 		BOOST_THROW_EXCEPTION(ValidationError(this, { "start_time" }, "Start time must be greater than 0."));
 }
 
-void Downtime::ValidateEndTime(const Timestamp& value, const ValidationUtils& utils)
+void Downtime::ValidateEndTime(const Lazy<Timestamp>& lvalue, const ValidationUtils& utils)
 {
-	ObjectImpl<Downtime>::ValidateEndTime(value, utils);
+	ObjectImpl<Downtime>::ValidateEndTime(lvalue, utils);
 
-	if (value <= 0)
+	if (lvalue() <= 0)
 		BOOST_THROW_EXCEPTION(ValidationError(this, { "end_time" }, "End time must be greater than 0."));
 }

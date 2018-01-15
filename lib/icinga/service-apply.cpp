@@ -45,28 +45,28 @@ bool Service::EvaluateApplyRuleInstance(const Host::Ptr& host, const String& nam
 		<< "Applying service '" << name << "' to host '" << host->GetName() << "' for rule " << di;
 #endif /* _DEBUG */
 
-	ConfigItemBuilder::Ptr builder = new ConfigItemBuilder(di);
-	builder->SetType(Service::TypeInstance);
-	builder->SetName(name);
-	builder->SetScope(frame.Locals->ShallowClone());
-	builder->SetIgnoreOnError(rule.GetIgnoreOnError());
+	ConfigItemBuilder builder{di};
+	builder.SetType(Service::TypeInstance);
+	builder.SetName(name);
+	builder.SetScope(frame.Locals->ShallowClone());
+	builder.SetIgnoreOnError(rule.GetIgnoreOnError());
 
-	builder->AddExpression(new SetExpression(MakeIndexer(ScopeThis, "host_name"), OpSetLiteral, MakeLiteral(host->GetName()), di));
+	builder.AddExpression(new SetExpression(MakeIndexer(ScopeThis, "host_name"), OpSetLiteral, MakeLiteral(host->GetName()), di));
 
-	builder->AddExpression(new SetExpression(MakeIndexer(ScopeThis, "name"), OpSetLiteral, MakeLiteral(name), di));
+	builder.AddExpression(new SetExpression(MakeIndexer(ScopeThis, "name"), OpSetLiteral, MakeLiteral(name), di));
 
 	String zone = host->GetZoneName();
 
 	if (!zone.IsEmpty())
-		builder->AddExpression(new SetExpression(MakeIndexer(ScopeThis, "zone"), OpSetLiteral, MakeLiteral(zone), di));
+		builder.AddExpression(new SetExpression(MakeIndexer(ScopeThis, "zone"), OpSetLiteral, MakeLiteral(zone), di));
 
-	builder->AddExpression(new SetExpression(MakeIndexer(ScopeThis, "package"), OpSetLiteral, MakeLiteral(rule.GetPackage()), di));
+	builder.AddExpression(new SetExpression(MakeIndexer(ScopeThis, "package"), OpSetLiteral, MakeLiteral(rule.GetPackage()), di));
 
-	builder->AddExpression(new OwnedExpression(rule.GetExpression()));
+	builder.AddExpression(new OwnedExpression(rule.GetExpression()));
 
-	builder->AddExpression(new ImportDefaultTemplatesExpression());
+	builder.AddExpression(new ImportDefaultTemplatesExpression());
 
-	ConfigItem::Ptr serviceItem = builder->Compile();
+	ConfigItem::Ptr serviceItem = builder.Compile();
 	serviceItem->Register();
 
 	return true;
@@ -95,9 +95,7 @@ bool Service::EvaluateApplyRule(const Host::Ptr& host, const ApplyRule& rule)
 			return false;
 		}
 	} else {
-		Array::Ptr instances = new Array();
-		instances->Add("");
-		vinstances = instances;
+		vinstances = new Array({ "" });
 	}
 
 	bool match = false;
@@ -108,8 +106,7 @@ bool Service::EvaluateApplyRule(const Host::Ptr& host, const ApplyRule& rule)
 
 		Array::Ptr arr = vinstances;
 
-		ObjectLock olock(arr);
-		for (const Value& instance : arr) {
+		for (const Value& instance : arr->GetView()) {
 			String name = rule.GetName();
 
 			if (!rule.GetFKVar().IsEmpty()) {

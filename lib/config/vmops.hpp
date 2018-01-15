@@ -46,8 +46,7 @@ public:
 	{
 		Array::Ptr imports = ScriptFrame::GetImports();
 
-		ObjectLock olock(imports);
-		for (const Value& import : imports) {
+		for (const Value& import : imports->GetView()) {
 			Object::Ptr obj = import;
 			if (obj->HasOwnField(name)) {
 				*result = import;
@@ -146,7 +145,7 @@ public:
 	static inline Value NewObject(ScriptFrame& frame, bool abstract, const Type::Ptr& type, const String& name, const std::shared_ptr<Expression>& filter,
 		const String& zone, const String& package, bool defaultTmpl, bool ignoreOnError, const std::map<String, std::unique_ptr<Expression> >& closedVars, const std::shared_ptr<Expression>& expression, const DebugInfo& debugInfo = DebugInfo())
 	{
-		ConfigItemBuilder::Ptr item = new ConfigItemBuilder(debugInfo);
+		ConfigItemBuilder item{debugInfo};
 
 		String checkName = name;
 
@@ -173,21 +172,21 @@ public:
 			BOOST_THROW_EXCEPTION(ScriptError(msgbuf.str(), debugInfo));
 		}
 
-		item->SetType(type);
-		item->SetName(name);
+		item.SetType(type);
+		item.SetName(name);
 
 		if (!abstract)
-			item->AddExpression(new ImportDefaultTemplatesExpression());
+			item.AddExpression(new ImportDefaultTemplatesExpression());
 
-		item->AddExpression(new OwnedExpression(expression));
-		item->SetAbstract(abstract);
-		item->SetScope(EvaluateClosedVars(frame, closedVars));
-		item->SetZone(zone);
-		item->SetPackage(package);
-		item->SetFilter(filter);
-		item->SetDefaultTemplate(defaultTmpl);
-		item->SetIgnoreOnError(ignoreOnError);
-		item->Compile()->Register();
+		item.AddExpression(new OwnedExpression(expression));
+		item.SetAbstract(abstract);
+		item.SetScope(EvaluateClosedVars(frame, closedVars));
+		item.SetZone(zone);
+		item.SetPackage(package);
+		item.SetFilter(filter);
+		item.SetDefaultTemplate(defaultTmpl);
+		item.SetIgnoreOnError(ignoreOnError);
+		item.Compile()->Register();
 
 		return Empty;
 	}
@@ -210,18 +209,10 @@ public:
 				BOOST_THROW_EXCEPTION(ScriptError("Cannot use array iterator for dictionary.", debugInfo));
 
 			Dictionary::Ptr dict = value;
-			std::vector<String> keys;
 
-			{
-				ObjectLock olock(dict);
-				for (const Dictionary::Pair& kv : dict) {
-					keys.push_back(kv.first);
-				}
-			}
-
-			for (const String& key : keys) {
-				frame.Locals->Set(fkvar, key);
-				frame.Locals->Set(fvvar, dict->Get(key));
+			for (const Dictionary::Pair& kv : dict->GetView()) {
+				frame.Locals->Set(fkvar, kv.first);
+				frame.Locals->Set(fvvar, kv.second);
 				ExpressionResult res = expression->Evaluate(frame);
 				CHECK_RESULT_LOOP(res);
 			}

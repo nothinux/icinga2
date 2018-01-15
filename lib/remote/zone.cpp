@@ -20,7 +20,6 @@
 #include "remote/zone.hpp"
 #include "remote/zone.tcpp"
 #include "remote/jsonrpcconnection.hpp"
-#include "base/objectlock.hpp"
 #include "base/logger.hpp"
 
 using namespace icinga;
@@ -39,8 +38,7 @@ void Zone::OnAllConfigLoaded()
 	Array::Ptr endpoints = GetEndpointsRaw();
 
 	if (endpoints) {
-		ObjectLock olock(endpoints);
-		for (const String& endpoint : endpoints) {
+		for (const String& endpoint : endpoints->GetView()) {
 			Endpoint::Ptr ep = Endpoint::GetByName(endpoint);
 
 			if (ep)
@@ -71,9 +69,7 @@ std::set<Endpoint::Ptr> Zone::GetEndpoints() const
 	Array::Ptr endpoints = GetEndpointsRaw();
 
 	if (endpoints) {
-		ObjectLock olock(endpoints);
-
-		for (const String& name : endpoints) {
+		for (const String& name : endpoints->GetView()) {
 			Endpoint::Ptr endpoint = Endpoint::GetByName(name);
 
 			if (!endpoint)
@@ -144,11 +140,11 @@ Zone::Ptr Zone::GetLocalZone()
 	return local->GetZone();
 }
 
-void Zone::ValidateEndpointsRaw(const Array::Ptr& value, const ValidationUtils& utils)
+void Zone::ValidateEndpointsRaw(const Lazy<Array::Ptr>& lvalue, const ValidationUtils& utils)
 {
-	ObjectImpl<Zone>::ValidateEndpointsRaw(value, utils);
+	ObjectImpl<Zone>::ValidateEndpointsRaw(lvalue, utils);
 
-	if (value && value->GetLength() > 2) {
+	if (lvalue() && lvalue()->GetLength() > 2) {
 		Log(LogWarning, "Zone")
 			<< "The Zone object '" << GetName() << "' has more than two endpoints."
 			<< " Due to a known issue this type of configuration is strongly"

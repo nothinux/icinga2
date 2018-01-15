@@ -943,8 +943,7 @@ String Utility::Join(const Array::Ptr& tokens, char separator, bool escapeSepara
 	String result;
 	bool first = true;
 
-	ObjectLock olock(tokens);
-	for (const Value& vtoken : tokens) {
+	for (const Value& vtoken : tokens->GetView()) {
 		String token = Convert::ToString(vtoken);
 
 		if (escapeSeparator) {

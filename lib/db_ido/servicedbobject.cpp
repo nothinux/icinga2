@@ -188,8 +188,7 @@ void ServiceDbObject::OnConfigUpdateHeavy()
 	queries.emplace_back(std::move(query1));
 
 	if (groups) {
-		ObjectLock olock(groups);
-		for (const String& groupName : groups) {
+		for (const String& groupName : groups->GetView()) {
 			ServiceGroup::Ptr group = ServiceGroup::GetByName(groupName);
 
 			DbQuery query2;
@@ -362,12 +361,11 @@ String ServiceDbObject::CalculateConfigHash(const Dictionary::Ptr& configFields)
 		if (!parent)
 			continue;
 
-		Array::Ptr depInfo = new Array();
-		depInfo->Add(parent->GetName());
-		depInfo->Add(dep->GetStateFilter());
-		depInfo->Add(dep->GetPeriodRaw());
-
-		dependencies->Add(depInfo);
+		dependencies->Add(new Array({
+			parent->GetName(),
+			dep->GetStateFilter(),
+			dep->GetPeriodRaw()
+		}));
 	}
 
 	dependencies->Sort();

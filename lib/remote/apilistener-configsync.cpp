@@ -123,8 +123,7 @@ Value ApiListener::ConfigUpdateObjectAPIHandler(const MessageOrigin::Ptr& origin
 			Log(LogCritical, "ApiListener")
 				<< "Could not create object '" << objName << "':";
 
-				ObjectLock olock(errors);
-			for (const String& error : errors) {
+				for (const String& error : errors->GetView()) {
 					Log(LogCritical, "ApiListener", error);
 				}
 
@@ -161,8 +160,7 @@ Value ApiListener::ConfigUpdateObjectAPIHandler(const MessageOrigin::Ptr& origin
 	Dictionary::Ptr modified_attributes = params->Get("modified_attributes");
 
 	if (modified_attributes) {
-		ObjectLock olock(modified_attributes);
-		for (const Dictionary::Pair& kv : modified_attributes) {
+		for (const Dictionary::Pair& kv : modified_attributes->GetView()) {
 			/* update all modified attributes
 			 * but do not update the object version yet.
 			 * This triggers cluster events otherwise.
@@ -178,13 +176,10 @@ Value ApiListener::ConfigUpdateObjectAPIHandler(const MessageOrigin::Ptr& origin
 	if (newOriginalAttributes && objOriginalAttributes) {
 		std::vector<String> restoreAttrs;
 
-		{
-			ObjectLock xlock(objOriginalAttributes);
-			for (const Dictionary::Pair& kv : objOriginalAttributes) {
-				/* original attribute was removed, restore it */
-				if (!newOriginalAttributes->Contains(kv.first))
-					restoreAttrs.push_back(kv.first);
-			}
+		for (const Dictionary::Pair& kv : objOriginalAttributes->GetView()) {
+			/* original attribute was removed, restore it */
+			if (!newOriginalAttributes->Contains(kv.first))
+				restoreAttrs.push_back(kv.first);
 		}
 
 		for (const String& key : restoreAttrs) {
@@ -261,8 +256,7 @@ Value ApiListener::ConfigDeleteObjectAPIHandler(const MessageOrigin::Ptr& origin
 	if (!ConfigObjectUtility::DeleteObject(object, true, errors)) {
 		Log(LogCritical, "ApiListener", "Could not delete object:");
 
-		ObjectLock olock(errors);
-		for (const String& error : errors) {
+		for (const String& error : errors->GetView()) {
 			Log(LogCritical, "ApiListener", error);
 		}
 	}
@@ -314,8 +308,7 @@ void ApiListener::UpdateConfigObject(const ConfigObject::Ptr& object, const Mess
 	Array::Ptr newOriginalAttributes = new Array();
 
 	if (original_attributes) {
-		ObjectLock olock(original_attributes);
-		for (const Dictionary::Pair& kv : original_attributes) {
+		for (const Dictionary::Pair& kv : original_attributes->GetView()) {
 			std::vector<String> tokens;
 			boost::algorithm::split(tokens, kv.first, boost::is_any_of("."));
 

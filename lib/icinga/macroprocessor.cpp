@@ -51,9 +51,7 @@ Value MacroProcessor::ResolveMacros(const Value& str, const ResolverList& resolv
 		Array::Ptr resultArr = new Array();
 		Array::Ptr arr = str;
 
-		ObjectLock olock(arr);
-
-		for (const Value& arg : arr) {
+		for (const Value& arg : arr->GetView()) {
 			/* Note: don't escape macros here. */
 			Value value = InternalResolveMacros(arg, resolvers, cr, missingMacro,
 				EscapeCallback(), resolvedMacros, useResolvedMacros, recursionLevel + 1);
@@ -69,9 +67,7 @@ Value MacroProcessor::ResolveMacros(const Value& str, const ResolverList& resolv
 		Dictionary::Ptr resultDict = new Dictionary();
 		Dictionary::Ptr dict = str;
 
-		ObjectLock olock(dict);
-
-		for (const Dictionary::Pair& kv : dict) {
+		for (const Dictionary::Pair& kv : dict->GetView()) {
 			/* Note: don't escape macros here. */
 			resultDict->Set(kv.first, InternalResolveMacros(kv.second, resolvers, cr, missingMacro,
 				EscapeCallback(), resolvedMacros, useResolvedMacros, recursionLevel + 1));
@@ -277,8 +273,7 @@ Value MacroProcessor::InternalResolveMacros(const String& str, const ResolverLis
 				Array::Ptr arr = resolved_macro;
 				Array::Ptr resolved_arr = new Array();
 
-				ObjectLock olock(arr);
-				for (const Value& value : arr) {
+				for (const Value& value : arr->GetView()) {
 					if (value.IsScalar()) {
 						resolved_arr->Add(InternalResolveMacros(value,
 							resolvers, cr, missingMacro, EscapeCallback(), nullptr,
@@ -351,16 +346,14 @@ void MacroProcessor::ValidateCustomVars(const ConfigObject::Ptr& object, const D
 		return;
 
 	/* string, array, dictionary */
-	ObjectLock olock(value);
-	for (const Dictionary::Pair& kv : value) {
+	for (const Dictionary::Pair& kv : value->GetView()) {
 		const Value& varval = kv.second;
 
 		if (varval.IsObjectType<Dictionary>()) {
-			/* only one dictonary level */
+			/* only one dictionary level */
 			Dictionary::Ptr varval_dict = varval;
 
-			ObjectLock xlock(varval_dict);
-			for (const Dictionary::Pair& kv_var : varval_dict) {
+			for (const Dictionary::Pair& kv_var : varval_dict->GetView()) {
 				if (!kv_var.second.IsString())
 					continue;
 
@@ -371,8 +364,7 @@ void MacroProcessor::ValidateCustomVars(const ConfigObject::Ptr& object, const D
 			/* check all array entries */
 			Array::Ptr varval_arr = varval;
 
-			ObjectLock ylock (varval_arr);
-			for (const Value& arrval : varval_arr) {
+			for (const Value& arrval : varval_arr->GetView()) {
 				if (!arrval.IsString())
 					continue;
 
@@ -407,8 +399,7 @@ Value MacroProcessor::EscapeMacroShellArg(const Value& value)
 	if (value.IsObjectType<Array>()) {
 		Array::Ptr arr = value;
 
-		ObjectLock olock(arr);
-		for (const Value& arg : arr) {
+		for (const Value& arg : arr->GetView()) {
 			if (result.GetLength() > 0)
 				result += " ";
 
@@ -452,8 +443,7 @@ Value MacroProcessor::ResolveArguments(const Value& command, const Dictionary::P
 	if (arguments) {
 		std::vector<CommandArgument> args;
 
-		ObjectLock olock(arguments);
-		for (const Dictionary::Pair& kv : arguments) {
+		for (const Dictionary::Pair& kv : arguments->GetView()) {
 			const Value& arginfo = kv.second;
 
 			CommandArgument arg;
@@ -543,8 +533,7 @@ Value MacroProcessor::ResolveArguments(const Value& command, const Dictionary::P
 				bool first = true;
 				Array::Ptr arr = static_cast<Array::Ptr>(arg.AValue);
 
-				ObjectLock olock(arr);
-				for (const Value& value : arr) {
+				for (const Value& value : arr->GetView()) {
 					bool add_key;
 
 					if (first) {

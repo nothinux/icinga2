@@ -43,8 +43,7 @@ static void EncodeDictionary(yajl_gen handle, const Dictionary::Ptr& dict)
 {
 	yajl_gen_map_open(handle);
 
-	ObjectLock olock(dict);
-	for (const Dictionary::Pair& kv : dict) {
+	for (const Dictionary::Pair& kv : dict->GetView()) {
 		yajl_gen_string(handle, reinterpret_cast<const unsigned char *>(kv.first.CStr()), kv.first.GetLength());
 		Encode(handle, kv.second);
 	}
@@ -56,8 +55,7 @@ static void EncodeArray(yajl_gen handle, const Array::Ptr& arr)
 {
 	yajl_gen_array_open(handle);
 
-	ObjectLock olock(arr);
-	for (const Value& value : arr) {
+	for (const Value& value : arr->GetView()) {
 		Encode(handle, value);
 	}
 
@@ -81,12 +79,24 @@ static void Encode(yajl_gen handle, const Value& value)
 
 			break;
 		case ValueObject:
-			if (value.IsObjectType<Dictionary>())
-				EncodeDictionary(handle, value);
-			else if (value.IsObjectType<Array>())
-				EncodeArray(handle, value);
-			else
-				yajl_gen_null(handle);
+			{
+				const Object::Ptr& obj = value.Get<Object::Ptr>();
+				Dictionary::Ptr dict = dynamic_pointer_cast<Dictionary>(obj);
+
+				if (dict) {
+					EncodeDictionary(handle, dict);
+					break;
+				}
+
+				Array::Ptr arr = dynamic_pointer_cast<Array>(obj);
+
+				if (arr) {
+					EncodeArray(handle, arr);
+					break;
+				}
+			}
+
+			yajl_gen_null(handle);
 
 			break;
 		case ValueEmpty:

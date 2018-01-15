@@ -73,8 +73,7 @@ void TimePeriod::AddSegment(double begin, double end)
 
 	if (segments) {
 		/* Try to merge the new segment into an existing segment. */
-		ObjectLock dlock(segments);
-		for (const Dictionary::Ptr& segment : segments) {
+		for (const Dictionary::Ptr& segment : segments->GetView()) {
 			if (segment->Get("begin") <= begin && segment->Get("end") >= end)
 				return; /* New segment is fully contained in this segment. */
 
@@ -98,9 +97,10 @@ void TimePeriod::AddSegment(double begin, double end)
 	}
 
 	/* Create new segment if we weren't able to merge this into an existing segment. */
-	Dictionary::Ptr segment = new Dictionary();
-	segment->Set("begin", begin);
-	segment->Set("end", end);
+	Dictionary::Ptr segment = new Dictionary({
+		{ "begin", begin },
+		{ "end", end }
+	});
 
 	if (!segments) {
 		segments = new Array();
@@ -137,8 +137,7 @@ void TimePeriod::RemoveSegment(double begin, double end)
 	Array::Ptr newSegments = new Array();
 
 	/* Try to split or adjust an existing segment. */
-	ObjectLock dlock(segments);
-	for (const Dictionary::Ptr& segment : segments) {
+	for (const Dictionary::Ptr& segment : segments->GetView()) {
 		/* Fully contained in the specified range? */
 		if (segment->Get("begin") >= begin && segment->Get("end") <= end)
 			continue;
@@ -208,8 +207,7 @@ void TimePeriod::PurgeSegments(double end)
 	Array::Ptr newSegments = new Array();
 
 	/* Remove old segments. */
-	ObjectLock dlock(segments);
-	for (const Dictionary::Ptr& segment : segments) {
+	for (const Dictionary::Ptr& segment : segments->GetView()) {
 		if (segment->Get("end") >= end)
 			newSegments->Add(segment);
 	}
@@ -226,10 +224,12 @@ void TimePeriod::Merge(const TimePeriod::Ptr& timeperiod, bool include)
 	Array::Ptr segments = timeperiod->GetSegments();
 
 	if (segments) {
-		ObjectLock dlock(segments);
 		ObjectLock ilock(this);
-		for (const Dictionary::Ptr& segment : segments) {
-			include ? AddSegment(segment) : RemoveSegment(segment);
+		for (const Dictionary::Ptr& segment : segments->GetView()) {
+			if (include)
+				AddSegment(segment);
+			else
+				RemoveSegment(segment);
 		}
 	}
 }
@@ -251,8 +251,7 @@ void TimePeriod::UpdateRegion(double begin, double end, bool clearExisting)
 		RemoveSegment(begin, end);
 
 		if (segments) {
-			ObjectLock dlock(segments);
-			for (const Dictionary::Ptr& segment : segments) {
+			for (const Dictionary::Ptr& segment : segments->GetView()) {
 				AddSegment(segment);
 			}
 		}
@@ -264,8 +263,7 @@ void TimePeriod::UpdateRegion(double begin, double end, bool clearExisting)
 	Array::Ptr timeranges = preferInclude ? GetExcludes() : GetIncludes();
 
 	if (timeranges) {
-		ObjectLock olock(timeranges);
-		for (const String& name : timeranges) {
+		for (const String& name : timeranges->GetView()) {
 			const TimePeriod::Ptr timeperiod = TimePeriod::GetByName(name);
 
 			if (timeperiod)
@@ -277,8 +275,7 @@ void TimePeriod::UpdateRegion(double begin, double end, bool clearExisting)
 	timeranges = preferInclude ? GetIncludes() : GetExcludes();
 
 	if (timeranges) {
-		ObjectLock olock(timeranges);
-		for (const String& name : timeranges) {
+		for (const String& name : timeranges->GetView()) {
 			const TimePeriod::Ptr timeperiod = TimePeriod::GetByName(name);
 
 			if (timeperiod)
@@ -302,8 +299,7 @@ bool TimePeriod::IsInside(double ts) const
 	Array::Ptr segments = GetSegments();
 
 	if (segments) {
-		ObjectLock dlock(segments);
-		for (const Dictionary::Ptr& segment : segments) {
+		for (const Dictionary::Ptr& segment : segments->GetView()) {
 			if (ts > segment->Get("begin") && ts < segment->Get("end"))
 				return true;
 		}
@@ -321,8 +317,7 @@ double TimePeriod::FindNextTransition(double begin)
 	double closestTransition = -1;
 
 	if (segments) {
-		ObjectLock dlock(segments);
-		for (const Dictionary::Ptr& segment : segments) {
+		for (const Dictionary::Ptr& segment : segments->GetView()) {
 			if (segment->Get("begin") > begin && (segment->Get("begin") < closestTransition || closestTransition == -1))
 				closestTransition = segment->Get("begin");
 
@@ -370,8 +365,7 @@ void TimePeriod::Dump()
 		<< "' until '" << Utility::FormatDateTime("%c", GetValidEnd());
 
 	if (segments) {
-		ObjectLock dlock(segments);
-		for (const Dictionary::Ptr& segment : segments) {
+		for (const Dictionary::Ptr& segment : segments->GetView()) {
 			Log(LogDebug, "TimePeriod")
 				<< "Segment: " << Utility::FormatDateTime("%c", segment->Get("begin")) << " <-> "
 				<< Utility::FormatDateTime("%c", segment->Get("end"));
@@ -381,9 +375,9 @@ void TimePeriod::Dump()
 	Log(LogDebug, "TimePeriod", "---");
 }
 
-void TimePeriod::ValidateRanges(const Dictionary::Ptr& value, const ValidationUtils& utils)
+void TimePeriod::ValidateRanges(const Lazy<Dictionary::Ptr>& lvalue, const ValidationUtils& utils)
 {
-	if (!value)
+	if (!lvalue())
 		return;
 
 	/* create a fake time environment to validate the definitions */
@@ -391,8 +385,7 @@ void TimePeriod::ValidateRanges(const Dictionary::Ptr& value, const ValidationUt
 	tm reference = Utility::LocalTime(refts);
 	Array::Ptr segments = new Array();
 
-	ObjectLock olock(value);
-	for (const Dictionary::Pair& kv : value) {
+	for (const Dictionary::Pair& kv : lvalue()->GetView()) {
 		try {
 			tm begin_tm, end_tm;
 			int stride;

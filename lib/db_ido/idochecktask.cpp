@@ -129,13 +129,13 @@ void IdoCheckTask::ScriptFunc(const Checkable::Ptr& checkable, const CheckResult
 		cr->SetOutput(msgbuf.str());
 	}
 
-	Array::Ptr perfdata = new Array();
-	perfdata->Add(new PerfdataValue("queries", qps));
-	perfdata->Add(new PerfdataValue("queries_1min", conn->GetQueryCount(60)));
-	perfdata->Add(new PerfdataValue("queries_5mins", conn->GetQueryCount(5 * 60)));
-	perfdata->Add(new PerfdataValue("queries_15mins", conn->GetQueryCount(15 * 60)));
-	perfdata->Add(new PerfdataValue("pending_queries", conn->GetPendingQueryCount()));
-	cr->SetPerformanceData(perfdata);
+	cr->SetPerformanceData(new Array({
+		new PerfdataValue("queries", qps),
+		new PerfdataValue("queries_1min", conn->GetQueryCount(60)),
+		new PerfdataValue("queries_5mins", conn->GetQueryCount(5 * 60)),
+		new PerfdataValue("queries_15mins", conn->GetQueryCount(15 * 60)),
+		new PerfdataValue("pending_queries", conn->GetPendingQueryCount())
+	}));
 
 	checkable->ProcessCheckResult(cr);
 }
