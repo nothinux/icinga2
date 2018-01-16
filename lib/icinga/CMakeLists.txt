@@ -49,7 +49,7 @@ set(icinga_SOURCES
   checkcommand.cpp checkcommand.hpp checkcommand.thpp
   checkresult.cpp checkresult.hpp checkresult.thpp
   cib.cpp cib.hpp
-  clusterevents.cpp clusterevents.hpp
+  clusterevents.cpp clusterevents.hpp clusterevents-check.cpp
   command.cpp command.hpp command.thpp
   comment.cpp comment.hpp comment.thpp
   compatutility.cpp compatutility.hpp
