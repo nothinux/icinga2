@@ -1,25 +1,9 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #include "base/socketevents.hpp"
 #include "base/exception.hpp"
 #include "base/logger.hpp"
+#include "base/utility.hpp"
 #include <boost/thread/once.hpp>
 #include <map>
 
@@ -57,11 +41,17 @@ void SocketEventEnginePoll::ThreadProc(int tid)
 					if (desc.second.Events == 0)
 						continue;
 
-					if (desc.second.EventInterface)
+					int events = desc.second.Events;
+
+					if (desc.second.EventInterface) {
 						desc.second.EventInterface->m_EnginePrivate = &pfds[i];
 
+						if (!desc.second.EventInterface->m_Events)
+							events = 0;
+					}
+
 					pfds[i].fd = desc.first;
-					pfds[i].events = desc.second.Events;
+					pfds[i].events = events;
 					descriptors[i] = desc.second;
 
 					i++;
@@ -105,8 +95,6 @@ void SocketEventEnginePoll::ThreadProc(int tid)
 				EventDescription event;
 				event.REvents = pfds[i].revents;
 				event.Descriptor = descriptors[i];
-				event.LifesupportReference = event.Descriptor.LifesupportObject;
-				VERIFY(event.LifesupportReference);
 
 				events.emplace_back(std::move(event));
 			}
@@ -126,7 +114,7 @@ void SocketEventEnginePoll::ThreadProc(int tid)
 	}
 }
 
-void SocketEventEnginePoll::Register(SocketEvents *se, Object *lifesupportObject)
+void SocketEventEnginePoll::Register(SocketEvents *se)
 {
 	int tid = se->m_ID % SOCKET_IOTHREADS;
 
@@ -138,7 +126,6 @@ void SocketEventEnginePoll::Register(SocketEvents *se, Object *lifesupportObject
 		SocketEventDescriptor desc;
 		desc.Events = 0;
 		desc.EventInterface = se;
-		desc.LifesupportObject = lifesupportObject;
 
 		VERIFY(m_Sockets[tid].find(se->m_FD) == m_Sockets[tid].end());
 

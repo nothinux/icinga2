@@ -1,24 +1,7 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #include "notification/notificationcomponent.hpp"
-#include "notification/notificationcomponent.tcpp"
+#include "notification/notificationcomponent-ti.cpp"
 #include "icinga/service.hpp"
 #include "icinga/icingaapplication.hpp"
 #include "base/configtype.hpp"
@@ -81,20 +64,32 @@ void NotificationComponent::NotificationTimerHandler()
 {
 	double now = Utility::GetTime();
 
+	/* Function already checks whether 'api' feature is enabled. */
+	Endpoint::Ptr myEndpoint = Endpoint::GetLocalEndpoint();
+
 	for (const Notification::Ptr& notification : ConfigType::GetObjectsByType<Notification>()) {
 		if (!notification->IsActive())
 			continue;
 
-		if (notification->IsPaused() && GetEnableHA())
+		String notificationName = notification->GetName();
+
+		/* Skip notification if paused, in a cluster setup & HA feature is enabled. */
+		if (notification->IsPaused() && myEndpoint && GetEnableHA()) {
+			Log(LogNotice, "NotificationComponent")
+				<< "Reminder notification '" << notificationName << "': HA cluster active, this endpoint does not have the authority (paused=true). Skipping.";
 			continue;
+		}
 
 		Checkable::Ptr checkable = notification->GetCheckable();
 
 		if (!IcingaApplication::GetInstance()->GetEnableNotifications() || !checkable->GetEnableNotifications())
 			continue;
 
-		if (notification->GetInterval() <= 0 && notification->GetNoMoreNotifications())
+		if (notification->GetInterval() <= 0 && notification->GetNoMoreNotifications()) {
+			Log(LogNotice, "NotificationComponent")
+				<< "Reminder notification '" << notificationName << "': Notification was sent out once and interval=0 disables reminder notifications.";
 			continue;
+		}
 
 		if (notification->GetNextNotification() > now)
 			continue;
@@ -116,21 +111,24 @@ void NotificationComponent::NotificationTimerHandler()
 			if (checkable->GetStateType() == StateTypeSoft)
 				continue;
 
+			/* Don't send reminder notifications for OK/Up states. */
 			if ((service && service->GetState() == ServiceOK) || (!service && host->GetState() == HostUp))
 				continue;
 
-			if (!reachable || checkable->IsInDowntime() || checkable->IsAcknowledged())
+			/* Skip in runtime filters. */
+			if (!reachable || checkable->IsInDowntime() || checkable->IsAcknowledged() || checkable->IsFlapping())
 				continue;
 		}
 
 		try {
 			Log(LogNotice, "NotificationComponent")
-				<< "Attempting to send reminder notification '" << notification->GetName() << "'";
+				<< "Attempting to send reminder notification '" << notificationName << "'.";
+
 			notification->BeginExecuteNotification(NotificationProblem, checkable->GetLastCheckResult(), false, true);
 		} catch (const std::exception& ex) {
 			Log(LogWarning, "NotificationComponent")
-				<< "Exception occured during notification for object '"
-				<< GetName() << "': " << DiagnosticInformation(ex);
+				<< "Exception occurred during notification for object '"
+				<< notificationName << "': " << DiagnosticInformation(ex, false);
 		}
 	}
 }

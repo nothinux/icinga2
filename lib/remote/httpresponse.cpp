@@ -1,34 +1,15 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #include "remote/httpresponse.hpp"
 #include "remote/httpchunkedencoding.hpp"
 #include "base/logger.hpp"
-#include <boost/algorithm/string/split.hpp>
-#include <boost/algorithm/string/classification.hpp>
 #include "base/application.hpp"
 #include "base/convert.hpp"
 
 using namespace icinga;
 
 HttpResponse::HttpResponse(Stream::Ptr stream, const HttpRequest& request)
-	: Complete(false), m_State(HttpResponseStart), m_Request(request), m_Stream(std::move(stream))
+	: Complete(false), m_State(HttpResponseStart), m_Request(&request), m_Stream(std::move(stream))
 { }
 
 void HttpResponse::SetStatus(int code, const String& message)
@@ -43,7 +24,7 @@ void HttpResponse::SetStatus(int code, const String& message)
 
 	String status = "HTTP/";
 
-	if (m_Request.ProtocolVersion == HttpVersion10)
+	if (m_Request->ProtocolVersion == HttpVersion10)
 		status += "1.0";
 	else
 		status += "1.1";
@@ -63,7 +44,7 @@ void HttpResponse::AddHeader(const String& key, const String& value)
 void HttpResponse::FinishHeaders()
 {
 	if (m_State == HttpResponseHeaders) {
-		if (m_Request.ProtocolVersion == HttpVersion11)
+		if (m_Request->ProtocolVersion == HttpVersion11)
 			AddHeader("Transfer-Encoding", "chunked");
 
 		AddHeader("Server", "Icinga/" + Application::GetAppVersion());
@@ -80,7 +61,7 @@ void HttpResponse::WriteBody(const char *data, size_t count)
 {
 	ASSERT(m_State == HttpResponseHeaders || m_State == HttpResponseBody);
 
-	if (m_Request.ProtocolVersion == HttpVersion10) {
+	if (m_Request->ProtocolVersion == HttpVersion10) {
 		if (!m_Body)
 			m_Body = new FIFO();
 
@@ -96,7 +77,7 @@ void HttpResponse::Finish()
 {
 	ASSERT(m_State != HttpResponseEnd);
 
-	if (m_Request.ProtocolVersion == HttpVersion10) {
+	if (m_Request->ProtocolVersion == HttpVersion10) {
 		if (m_Body)
 			AddHeader("Content-Length", Convert::ToString(m_Body->GetAvailableBytes()));
 
@@ -114,7 +95,13 @@ void HttpResponse::Finish()
 
 	m_State = HttpResponseEnd;
 
-	if (m_Request.ProtocolVersion == HttpVersion10 || m_Request.Headers->Get("connection") == "close")
+	/* Close the connection on
+	 * a) HTTP/1.0
+	 * b) Connection: close in the sent header.
+	 *
+	 * Do this here and not in DataAvailableHandler - there might still be incoming data in there.
+	 */
+	if (m_Request->ProtocolVersion == HttpVersion10 || m_Request->Headers->Get("connection") == "close")
 		m_Stream->Shutdown();
 }
 
@@ -132,8 +119,7 @@ bool HttpResponse::Parse(StreamReadContext& src, bool may_wait)
 			if (line == "")
 				return true;
 
-			std::vector<String> tokens;
-			boost::algorithm::split(tokens, line, boost::is_any_of(" "));
+			std::vector<String> tokens = line.Split(" ");
 			Log(LogDebug, "HttpRequest")
 				<< "line: " << line << ", tokens: " << tokens.size();
 			if (tokens.size() < 2)
@@ -207,6 +193,11 @@ bool HttpResponse::Parse(StreamReadContext& src, bool may_wait)
 				lengthIndicator = Convert::ToLong(contentLengthHeader);
 			}
 
+			if (!hasLengthIndicator && ProtocolVersion != HttpVersion10 && !Headers->Contains("transfer-encoding")) {
+				Complete = true;
+				return true;
+			}
+
 			if (hasLengthIndicator && src.Eof)
 				BOOST_THROW_EXCEPTION(std::invalid_argument("Unexpected EOF in HTTP body"));
 
@@ -260,4 +251,9 @@ size_t HttpResponse::GetBodySize() const
 bool HttpResponse::IsPeerConnected() const
 {
 	return !m_Stream->IsEof();
+}
+
+void HttpResponse::RebindRequest(const HttpRequest& request)
+{
+	m_Request = &request;
 }

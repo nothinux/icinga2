@@ -1,32 +1,13 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #include "icinga/downtime.hpp"
-#include "icinga/downtime.tcpp"
+#include "icinga/downtime-ti.cpp"
 #include "icinga/host.hpp"
 #include "icinga/scheduleddowntime.hpp"
 #include "remote/configobjectutility.hpp"
 #include "base/configtype.hpp"
 #include "base/utility.hpp"
 #include "base/timer.hpp"
-#include <boost/algorithm/string/split.hpp>
-#include <boost/algorithm/string/classification.hpp>
 #include <boost/thread/once.hpp>
 
 using namespace icinga;
@@ -43,6 +24,15 @@ boost::signals2::signal<void (const Downtime::Ptr&)> Downtime::OnDowntimeStarted
 boost::signals2::signal<void (const Downtime::Ptr&)> Downtime::OnDowntimeTriggered;
 
 REGISTER_TYPE(Downtime);
+
+INITIALIZE_ONCE(&Downtime::StaticInitialize);
+
+void Downtime::StaticInitialize()
+{
+	ScriptGlobal::Set("Icinga.DowntimeNoChildren", "DowntimeNoChildren", true);
+	ScriptGlobal::Set("Icinga.DowntimeTriggeredChildren", "DowntimeTriggeredChildren", true);
+	ScriptGlobal::Set("Icinga.DowntimeNonTriggeredChildren", "DowntimeNonTriggeredChildren", true);
+}
 
 String DowntimeNameComposer::MakeName(const String& shortName, const Object::Ptr& context) const
 {
@@ -63,8 +53,7 @@ String DowntimeNameComposer::MakeName(const String& shortName, const Object::Ptr
 
 Dictionary::Ptr DowntimeNameComposer::ParseName(const String& name) const
 {
-	std::vector<String> tokens;
-	boost::algorithm::split(tokens, name, boost::is_any_of("!"));
+	std::vector<String> tokens = name.Split("!");
 
 	if (tokens.size() < 2)
 		BOOST_THROW_EXCEPTION(std::invalid_argument("Invalid Downtime name."));
@@ -161,16 +150,15 @@ bool Downtime::IsInEffect() const
 {
 	double now = Utility::GetTime();
 
-	if (now < GetStartTime() ||
-		now > GetEndTime())
-		return false;
-
-	if (GetFixed())
-		return true;
+	if (GetFixed()) {
+		/* fixed downtimes are in effect during the entire [start..end) interval */
+		return (now >= GetStartTime() && now < GetEndTime());
+	}
 
 	double triggerTime = GetTriggerTime();
 
 	if (triggerTime == 0)
+		/* flexible downtime has not been triggered yet */
 		return false;
 
 	return (now < triggerTime + GetDuration());
@@ -205,8 +193,12 @@ bool Downtime::IsExpired() const
 
 bool Downtime::HasValidConfigOwner() const
 {
+	if (!ScheduledDowntime::AllConfigIsLoaded()) {
+		return true;
+	}
+
 	String configOwner = GetConfigOwner();
-	return configOwner.IsEmpty() || GetObject<ScheduledDowntime>(configOwner);
+	return configOwner.IsEmpty() || Zone::GetByName(GetAuthoritativeZone()) != Zone::GetLocalZone() || GetObject<ScheduledDowntime>(configOwner);
 }
 
 int Downtime::GetNextDowntimeID()
@@ -242,6 +234,14 @@ String Downtime::AddDowntime(const Checkable::Ptr& checkable, const String& auth
 	attrs->Set("config_owner", scheduledDowntime);
 	attrs->Set("entry_time", Utility::GetTime());
 
+	if (!scheduledDowntime.IsEmpty()) {
+		auto localZone (Zone::GetLocalZone());
+
+		if (localZone) {
+			attrs->Set("authoritative_zone", localZone->GetName());
+		}
+	}
+
 	Host::Ptr host;
 	Service::Ptr service;
 	tie(host, service) = GetHostService(checkable);
@@ -250,7 +250,23 @@ String Downtime::AddDowntime(const Checkable::Ptr& checkable, const String& auth
 	if (service)
 		attrs->Set("service_name", service->GetShortName());
 
-	String zone = checkable->GetZoneName();
+	String zone;
+
+	if (!scheduledDowntime.IsEmpty()) {
+		auto sdt (ScheduledDowntime::GetByName(scheduledDowntime));
+
+		if (sdt) {
+			auto sdtZone (sdt->GetZone());
+
+			if (sdtZone) {
+				zone = sdtZone->GetName();
+			}
+		}
+	}
+
+	if (zone.IsEmpty()) {
+		zone = checkable->GetZoneName();
+	}
 
 	if (!zone.IsEmpty())
 		attrs->Set("zone", zone);
@@ -259,7 +275,7 @@ String Downtime::AddDowntime(const Checkable::Ptr& checkable, const String& auth
 
 	Array::Ptr errors = new Array();
 
-	if (!ConfigObjectUtility::CreateObject(Downtime::TypeInstance, fullName, config, errors)) {
+	if (!ConfigObjectUtility::CreateObject(Downtime::TypeInstance, fullName, config, errors, nullptr)) {
 		ObjectLock olock(errors);
 		for (const String& error : errors) {
 			Log(LogCritical, "Downtime", error);
@@ -312,7 +328,7 @@ void Downtime::RemoveDowntime(const String& id, bool cancelled, bool expired, co
 
 	Array::Ptr errors = new Array();
 
-	if (!ConfigObjectUtility::DeleteObject(downtime, false, errors)) {
+	if (!ConfigObjectUtility::DeleteObject(downtime, false, errors, nullptr)) {
 		ObjectLock olock(errors);
 		for (const String& error : errors) {
 			Log(LogCritical, "Downtime", error);
@@ -423,4 +439,21 @@ void Downtime::ValidateEndTime(const Lazy<Timestamp>& lvalue, const ValidationUt
 
 	if (lvalue() <= 0)
 		BOOST_THROW_EXCEPTION(ValidationError(this, { "end_time" }, "End time must be greater than 0."));
+}
+
+DowntimeChildOptions Downtime::ChildOptionsFromValue(const Value& options)
+{
+	if (options == "DowntimeNoChildren")
+		return DowntimeNoChildren;
+	else if (options == "DowntimeTriggeredChildren")
+		return DowntimeTriggeredChildren;
+	else if (options == "DowntimeNonTriggeredChildren")
+		return DowntimeNonTriggeredChildren;
+	else if (options.IsNumber()) {
+		int number = options;
+		if (number >= 0 && number <= 2)
+			return static_cast<DowntimeChildOptions>(number);
+	}
+
+	BOOST_THROW_EXCEPTION(std::invalid_argument("Invalid child option specified"));
 }

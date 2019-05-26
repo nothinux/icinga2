@@ -1,29 +1,16 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #ifndef OBJECT_H
 #define OBJECT_H
 
 #include "base/i2-base.hpp"
 #include "base/debug.hpp"
-#include <boost/thread/condition_variable.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <atomic>
+#include <cstddef>
+#include <cstdint>
+#include <mutex>
+#include <thread>
 #include <vector>
 
 using boost::intrusive_ptr;
@@ -58,11 +45,16 @@ extern Value Empty;
 	DECLARE_PTR_TYPEDEFS(klass); \
 	IMPL_TYPE_LOOKUP();
 
+#define REQUIRE_NOT_NULL(ptr) RequireNotNullInternal(ptr, #ptr)
+
+void RequireNotNullInternal(const intrusive_ptr<Object>& object, const char *description);
+
+void DefaultObjectFactoryCheckArgs(const std::vector<Value>& args);
+
 template<typename T>
 intrusive_ptr<Object> DefaultObjectFactory(const std::vector<Value>& args)
 {
-	if (!args.empty())
-		BOOST_THROW_EXCEPTION(std::invalid_argument("Constructor does not take any arguments."));
+	DefaultObjectFactoryCheckArgs(args);
 
 	return new T();
 }
@@ -129,10 +121,10 @@ struct Lazy
 	operator Lazy<U>() const
 	{
 		if (m_Cached)
-			return Lazy<U>(m_Value);
+			return Lazy<U>(static_cast<U>(m_Value));
 		else {
 			Accessor accessor = m_Accessor;
-			return Lazy<U>([accessor]() { return static_cast<U>(accessor()); });
+			return Lazy<U>(static_cast<typename Lazy<U>::Accessor>([accessor]() { return static_cast<U>(accessor()); }));
 		}
 	}
 
@@ -166,7 +158,7 @@ class Object
 public:
 	DECLARE_PTR_TYPEDEFS(Object);
 
-	Object() = default;
+	Object();
 	virtual ~Object();
 
 	virtual String ToString() const;
@@ -178,7 +170,7 @@ public:
 	virtual void SetField(int id, const Value& value, bool suppress_events = false, const Value& cookie = Empty);
 	virtual Value GetField(int id) const;
 	virtual Value GetFieldByName(const String& field, bool sandboxed, const DebugInfo& debugInfo) const;
-	virtual void SetFieldByName(const String& field, const Value& value, const DebugInfo& debugInfo);
+	virtual void SetFieldByName(const String& field, const Value& value, bool overrideFrozen, const DebugInfo& debugInfo);
 	virtual bool HasOwnField(const String& field) const;
 	virtual bool GetOwnField(const String& field, Value *result) const;
 	virtual void ValidateField(int id, const Lazy<Value>& lvalue, const ValidationUtils& utils);
@@ -199,15 +191,12 @@ private:
 	Object(const Object& other) = delete;
 	Object& operator=(const Object& rhs) = delete;
 
-	uintptr_t m_References{0};
-	mutable uintptr_t m_Mutex{0};
+	std::atomic<uint_fast64_t> m_References;
+	mutable std::recursive_mutex m_Mutex;
 
 #ifdef I2_DEBUG
-#	ifndef _WIN32
-	mutable pthread_t m_LockOwner;
-#	else /* _WIN32 */
-	mutable DWORD m_LockOwner;
-#	endif /* _WIN32 */
+	mutable std::atomic<std::thread::id> m_LockOwner;
+	mutable size_t m_LockCount = 0;
 #endif /* I2_DEBUG */
 
 	friend struct ObjectLock;

@@ -1,35 +1,20 @@
-# Icinga 2
-# Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)
-#
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation
-# Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
+# Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+
 
-mkclass_target(idopgsqlconnection.ti idopgsqlconnection.tcpp idopgsqlconnection.thpp)
+mkclass_target(idopgsqlconnection.ti idopgsqlconnection-ti.cpp idopgsqlconnection-ti.hpp)
 
 set(db_ido_pgsql_SOURCES
-  idopgsqlconnection.cpp idopgsqlconnection.hpp idopgsqlconnection.thpp
+  idopgsqlconnection.cpp idopgsqlconnection.hpp idopgsqlconnection-ti.hpp
 )
 
 if(ICINGA2_UNITY_BUILD)
-    mkunity_target(db_ido_pgsql db_ido_pgsql db_ido_pgsql_SOURCES)
+  mkunity_target(db_ido_pgsql db_ido_pgsql db_ido_pgsql_SOURCES)
 endif()
 
-add_library(db_ido_pgsql STATIC ${db_ido_pgsql_SOURCES})
+add_library(db_ido_pgsql OBJECT ${db_ido_pgsql_SOURCES})
 
 include_directories(${PostgreSQL_INCLUDE_DIRS})
 
-target_link_libraries(db_ido_pgsql ${Boost_LIBRARIES} base config icinga db_ido)
+add_dependencies(db_ido_pgsql base config icinga db_ido)
 
 set_target_properties (
   db_ido_pgsql PROPERTIES
@@ -38,7 +23,7 @@ set_target_properties (
 
 install_if_not_exists(
   ${PROJECT_SOURCE_DIR}/etc/icinga2/features-available/ido-pgsql.conf
-  ${CMAKE_INSTALL_SYSCONFDIR}/icinga2/features-available
+  ${ICINGA2_CONFIGDIR}/features-available
 )
 
 install(

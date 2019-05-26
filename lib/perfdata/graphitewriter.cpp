@@ -1,25 +1,9 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #include "perfdata/graphitewriter.hpp"
-#include "perfdata/graphitewriter.tcpp"
+#include "perfdata/graphitewriter-ti.cpp"
 #include "icinga/service.hpp"
+#include "icinga/checkcommand.hpp"
 #include "icinga/macroprocessor.hpp"
 #include "icinga/icingaapplication.hpp"
 #include "base/tcpsocket.hpp"
@@ -35,8 +19,6 @@
 #include "base/exception.hpp"
 #include "base/statsfunction.hpp"
 #include <boost/algorithm/string.hpp>
-#include <boost/algorithm/string/classification.hpp>
-#include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <utility>
 
@@ -51,6 +33,15 @@ void GraphiteWriter::OnConfigLoaded()
 	ObjectImpl<GraphiteWriter>::OnConfigLoaded();
 
 	m_WorkQueue.SetName("GraphiteWriter, " + GetName());
+
+	if (!GetEnableHa()) {
+		Log(LogDebug, "GraphiteWriter")
+			<< "HA functionality disabled. Won't pause connection: " << GetName();
+
+		SetHAMode(HARunEverywhere);
+	} else {
+		SetHAMode(HARunOnce);
+	}
 }
 
 void GraphiteWriter::StatsFunc(const Dictionary::Ptr& status, const Array::Ptr& perfdata)
@@ -74,12 +65,12 @@ void GraphiteWriter::StatsFunc(const Dictionary::Ptr& status, const Array::Ptr& 
 	status->Set("graphitewriter", new Dictionary(std::move(nodes)));
 }
 
-void GraphiteWriter::Start(bool runtimeCreated)
+void GraphiteWriter::Resume()
 {
-	ObjectImpl<GraphiteWriter>::Start(runtimeCreated);
+	ObjectImpl<GraphiteWriter>::Resume();
 
 	Log(LogInformation, "GraphiteWriter")
-		<< "'" << GetName() << "' started.";
+		<< "'" << GetName() << "' resumed.";
 
 	/* Register exception handler for WQ tasks. */
 	m_WorkQueue.SetExceptionCallback(std::bind(&GraphiteWriter::ExceptionHandler, this, _1));
@@ -95,14 +86,28 @@ void GraphiteWriter::Start(bool runtimeCreated)
 	Checkable::OnNewCheckResult.connect(std::bind(&GraphiteWriter::CheckResultHandler, this, _1, _2));
 }
 
-void GraphiteWriter::Stop(bool runtimeRemoved)
+/* Pause is equivalent to Stop, but with HA capabilities to resume at runtime. */
+void GraphiteWriter::Pause()
 {
-	Log(LogInformation, "GraphiteWriter")
-		<< "'" << GetName() << "' stopped.";
+	m_ReconnectTimer.reset();
+
+	try {
+		ReconnectInternal();
+	} catch (const std::exception&) {
+		Log(LogInformation, "GraphiteWriter")
+			<< "'" << GetName() << "' paused. Unable to connect, not flushing buffers. Data may be lost on reload.";
+
+		ObjectImpl<GraphiteWriter>::Pause();
+		return;
+	}
 
 	m_WorkQueue.Join();
+	DisconnectInternal();
 
-	ObjectImpl<GraphiteWriter>::Stop(runtimeRemoved);
+	Log(LogInformation, "GraphiteWriter")
+		<< "'" << GetName() << "' paused.";
+
+	ObjectImpl<GraphiteWriter>::Pause();
 }
 
 void GraphiteWriter::AssertOnWorkQueue()
@@ -128,6 +133,16 @@ void GraphiteWriter::Reconnect()
 {
 	AssertOnWorkQueue();
 
+	if (IsPaused()) {
+		SetConnected(false);
+		return;
+	}
+
+	ReconnectInternal();
+}
+
+void GraphiteWriter::ReconnectInternal()
+{
 	double startTime = Utility::GetTime();
 
 	CONTEXT("Reconnecting to Graphite '" + GetName() + "'");
@@ -160,6 +175,9 @@ void GraphiteWriter::Reconnect()
 
 void GraphiteWriter::ReconnectTimerHandler()
 {
+	if (IsPaused())
+		return;
+
 	m_WorkQueue.Enqueue(std::bind(&GraphiteWriter::Reconnect, this), PriorityNormal);
 }
 
@@ -167,6 +185,11 @@ void GraphiteWriter::Disconnect()
 {
 	AssertOnWorkQueue();
 
+	DisconnectInternal();
+}
+
+void GraphiteWriter::DisconnectInternal()
+{
 	if (!GetConnected())
 		return;
 
@@ -177,6 +200,9 @@ void GraphiteWriter::Disconnect()
 
 void GraphiteWriter::CheckResultHandler(const Checkable::Ptr& checkable, const CheckResult::Ptr& cr)
 {
+	if (IsPaused())
+		return;
+
 	m_WorkQueue.Enqueue(std::bind(&GraphiteWriter::CheckResultHandlerInternal, this, checkable, cr));
 }
 
@@ -185,6 +211,10 @@ void GraphiteWriter::CheckResultHandlerInternal(const Checkable::Ptr& checkable,
 	AssertOnWorkQueue();
 
 	CONTEXT("Processing check result for '" + checkable->GetName() + "'");
+
+	/* TODO: Deal with missing connection here. Needs refactoring
+	 * into parsing the actual performance data and then putting it
+	 * into a queue for re-inserting. */
 
 	if (!IcingaApplication::GetInstance()->GetEnablePerfdata() || !checkable->GetEnablePerfdata())
 		return;
@@ -214,30 +244,32 @@ void GraphiteWriter::CheckResultHandlerInternal(const Checkable::Ptr& checkable,
 
 	if (GetEnableSendMetadata()) {
 		if (service) {
-			SendMetric(prefixMetadata, "state", service->GetState(), ts);
+			SendMetric(checkable, prefixMetadata, "state", service->GetState(), ts);
 		} else {
-			SendMetric(prefixMetadata, "state", host->GetState(), ts);
+			SendMetric(checkable, prefixMetadata, "state", host->GetState(), ts);
 		}
 
-		SendMetric(prefixMetadata, "current_attempt", checkable->GetCheckAttempt(), ts);
-		SendMetric(prefixMetadata, "max_check_attempts", checkable->GetMaxCheckAttempts(), ts);
-		SendMetric(prefixMetadata, "state_type", checkable->GetStateType(), ts);
-		SendMetric(prefixMetadata, "reachable", checkable->IsReachable(), ts);
-		SendMetric(prefixMetadata, "downtime_depth", checkable->GetDowntimeDepth(), ts);
-		SendMetric(prefixMetadata, "acknowledgement", checkable->GetAcknowledgement(), ts);
-		SendMetric(prefixMetadata, "latency", cr->CalculateLatency(), ts);
-		SendMetric(prefixMetadata, "execution_time", cr->CalculateExecutionTime(), ts);
+		SendMetric(checkable, prefixMetadata, "current_attempt", checkable->GetCheckAttempt(), ts);
+		SendMetric(checkable, prefixMetadata, "max_check_attempts", checkable->GetMaxCheckAttempts(), ts);
+		SendMetric(checkable, prefixMetadata, "state_type", checkable->GetStateType(), ts);
+		SendMetric(checkable, prefixMetadata, "reachable", checkable->IsReachable(), ts);
+		SendMetric(checkable, prefixMetadata, "downtime_depth", checkable->GetDowntimeDepth(), ts);
+		SendMetric(checkable, prefixMetadata, "acknowledgement", checkable->GetAcknowledgement(), ts);
+		SendMetric(checkable, prefixMetadata, "latency", cr->CalculateLatency(), ts);
+		SendMetric(checkable, prefixMetadata, "execution_time", cr->CalculateExecutionTime(), ts);
 	}
 
-	SendPerfdata(prefixPerfdata, cr, ts);
+	SendPerfdata(checkable, prefixPerfdata, cr, ts);
 }
 
-void GraphiteWriter::SendPerfdata(const String& prefix, const CheckResult::Ptr& cr, double ts)
+void GraphiteWriter::SendPerfdata(const Checkable::Ptr& checkable, const String& prefix, const CheckResult::Ptr& cr, double ts)
 {
 	Array::Ptr perfdata = cr->GetPerformanceData();
 
 	if (!perfdata)
 		return;
+
+	CheckCommand::Ptr checkCommand = checkable->GetCheckCommand();
 
 	ObjectLock olock(perfdata);
 	for (const Value& val : perfdata) {
@@ -250,41 +282,43 @@ void GraphiteWriter::SendPerfdata(const String& prefix, const CheckResult::Ptr& 
 				pdv = PerfdataValue::Parse(val);
 			} catch (const std::exception&) {
 				Log(LogWarning, "GraphiteWriter")
-					<< "Ignoring invalid perfdata value: " << val;
+					<< "Ignoring invalid perfdata for checkable '"
+					<< checkable->GetName() << "' and command '"
+					<< checkCommand->GetName() << "' with value: " << val;
 				continue;
 			}
 		}
 
 		String escapedKey = EscapeMetricLabel(pdv->GetLabel());
 
-		SendMetric(prefix, escapedKey + ".value", pdv->GetValue(), ts);
+		SendMetric(checkable, prefix, escapedKey + ".value", pdv->GetValue(), ts);
 
 		if (GetEnableSendThresholds()) {
 			if (pdv->GetCrit())
-				SendMetric(prefix, escapedKey + ".crit", pdv->GetCrit(), ts);
+				SendMetric(checkable, prefix, escapedKey + ".crit", pdv->GetCrit(), ts);
 			if (pdv->GetWarn())
-				SendMetric(prefix, escapedKey + ".warn", pdv->GetWarn(), ts);
+				SendMetric(checkable, prefix, escapedKey + ".warn", pdv->GetWarn(), ts);
 			if (pdv->GetMin())
-				SendMetric(prefix, escapedKey + ".min", pdv->GetMin(), ts);
+				SendMetric(checkable, prefix, escapedKey + ".min", pdv->GetMin(), ts);
 			if (pdv->GetMax())
-				SendMetric(prefix, escapedKey + ".max", pdv->GetMax(), ts);
+				SendMetric(checkable, prefix, escapedKey + ".max", pdv->GetMax(), ts);
 		}
 	}
 }
 
-void GraphiteWriter::SendMetric(const String& prefix, const String& name, double value, double ts)
+void GraphiteWriter::SendMetric(const Checkable::Ptr& checkable, const String& prefix, const String& name, double value, double ts)
 {
 	std::ostringstream msgbuf;
 	msgbuf << prefix << "." << name << " " << Convert::ToString(value) << " " << static_cast<long>(ts);
 
 	Log(LogDebug, "GraphiteWriter")
-		<< "Add to metric list:'" << msgbuf.str() << "'.";
+		<< "Checkable '" << checkable->GetName() << "' adds to metric list: '" << msgbuf.str() << "'.";
 
 	// do not send \n to debug log
 	msgbuf << "\n";
 	String metric = msgbuf.str();
 
-	ObjectLock olock(this);
+	boost::mutex::scoped_lock lock(m_StreamMutex);
 
 	if (!GetConnected())
 		return;

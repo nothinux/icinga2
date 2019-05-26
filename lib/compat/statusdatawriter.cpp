@@ -1,24 +1,7 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #include "compat/statusdatawriter.hpp"
-#include "compat/statusdatawriter.tcpp"
+#include "compat/statusdatawriter-ti.cpp"
 #include "icinga/icingaapplication.hpp"
 #include "icinga/cib.hpp"
 #include "icinga/hostgroup.hpp"
@@ -76,6 +59,9 @@ void StatusDataWriter::Start(bool runtimeCreated)
 
 	Log(LogInformation, "StatusDataWriter")
 		<< "'" << GetName() << "' started.";
+
+	Log(LogWarning, "StatusDataWriter")
+		<< "This feature is DEPRECATED and will be removed in future releases. Check the roadmap at https://github.com/Icinga/icinga2/milestones";
 
 	m_ObjectsCacheOutdated = true;
 
@@ -391,7 +377,7 @@ void StatusDataWriter::DumpCheckableStatusAttrs(std::ostream& fp, const Checkabl
 		"\t" "last_state_change=" << static_cast<long>(checkable->GetLastStateChange()) << "\n"
 		"\t" "last_hard_state_change=" << static_cast<long>(checkable->GetLastHardStateChange()) << "\n"
 		"\t" "last_update=" << static_cast<long>(Utility::GetTime()) << "\n"
-		"\t" "notifications_enabled" "\t" << Convert::ToLong(checkable->GetEnableNotifications()) << "\n"
+		"\t" "notifications_enabled=" << Convert::ToLong(checkable->GetEnableNotifications()) << "\n"
 		"\t" "active_checks_enabled=" << Convert::ToLong(checkable->GetEnableActiveChecks()) << "\n"
 		"\t" "passive_checks_enabled=" << Convert::ToLong(checkable->GetEnablePassiveChecks()) << "\n"
 		"\t" "flap_detection_enabled=" << Convert::ToLong(checkable->GetEnableFlapping()) << "\n"
@@ -556,6 +542,7 @@ void StatusDataWriter::UpdateObjectsCache()
 {
 	CONTEXT("Writing objects.cache file");
 
+	/* Use the compat path here from the .ti generated class. */
 	String objectsPath = GetObjectsPath();
 
 	std::fstream objectfp;
@@ -776,16 +763,7 @@ void StatusDataWriter::UpdateObjectsCache()
 
 	objectfp.close();
 
-#ifdef _WIN32
-	_unlink(objectsPath.CStr());
-#endif /* _WIN32 */
-
-	if (rename(tempObjectsPath.CStr(), objectsPath.CStr()) < 0) {
-		BOOST_THROW_EXCEPTION(posix_error()
-			<< boost::errinfo_api_function("rename")
-			<< boost::errinfo_errno(errno)
-			<< boost::errinfo_file_name(tempObjectsPath));
-	}
+	Utility::RenameFile(tempObjectsPath, objectsPath);
 }
 
 /**
@@ -858,16 +836,7 @@ void StatusDataWriter::StatusTimerHandler()
 
 	statusfp.close();
 
-#ifdef _WIN32
-	_unlink(statusPath.CStr());
-#endif /* _WIN32 */
-
-	if (rename(tempStatusPath.CStr(), statusPath.CStr()) < 0) {
-		BOOST_THROW_EXCEPTION(posix_error()
-			<< boost::errinfo_api_function("rename")
-			<< boost::errinfo_errno(errno)
-			<< boost::errinfo_file_name(tempStatusPath));
-	}
+	Utility::RenameFile(tempStatusPath, statusPath);
 
 	Log(LogNotice, "StatusDataWriter")
 		<< "Writing status.dat file took " << Utility::FormatDuration(Utility::GetTime() - start);

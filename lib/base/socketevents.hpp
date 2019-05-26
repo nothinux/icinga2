@@ -1,27 +1,12 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #ifndef SOCKETEVENTS_H
 #define SOCKETEVENTS_H
 
 #include "base/i2-base.hpp"
 #include "base/socket.hpp"
+#include "base/stream.hpp"
+#include <boost/thread/condition_variable.hpp>
 #include <thread>
 
 #ifndef _WIN32
@@ -36,9 +21,11 @@ namespace icinga
  *
  * @ingroup base
  */
-class SocketEvents
+class SocketEvents : public Stream
 {
 public:
+	DECLARE_PTR_TYPEDEFS(SocketEvents);
+
 	~SocketEvents();
 
 	virtual void OnEvent(int revents);
@@ -53,7 +40,7 @@ public:
 	void SetEnginePrivate(void *priv);
 
 protected:
-	SocketEvents(const Socket::Ptr& socket, Object *lifesupportObject);
+	SocketEvents(const Socket::Ptr& socket);
 
 private:
 	int m_ID;
@@ -67,7 +54,7 @@ private:
 
 	void WakeUpThread(bool wait = false);
 
-	void Register(Object *lifesupportObject);
+	void Register();
 
 	friend class SocketEventEnginePoll;
 	friend class SocketEventEngineEpoll;
@@ -78,15 +65,13 @@ private:
 struct SocketEventDescriptor
 {
 	int Events{POLLIN};
-	SocketEvents *EventInterface{nullptr};
-	Object *LifesupportObject{nullptr};
+	SocketEvents::Ptr EventInterface;
 };
 
 struct EventDescription
 {
 	int REvents;
 	SocketEventDescriptor Descriptor;
-	Object::Ptr LifesupportReference;
 };
 
 class SocketEventEngine
@@ -101,7 +86,7 @@ public:
 protected:
 	virtual void InitializeThread(int tid) = 0;
 	virtual void ThreadProc(int tid) = 0;
-	virtual void Register(SocketEvents *se, Object *lifesupportObject) = 0;
+	virtual void Register(SocketEvents *se) = 0;
 	virtual void Unregister(SocketEvents *se) = 0;
 	virtual void ChangeEvents(SocketEvents *se, int events) = 0;
 
@@ -118,7 +103,7 @@ protected:
 class SocketEventEnginePoll final : public SocketEventEngine
 {
 public:
-	void Register(SocketEvents *se, Object *lifesupportObject) override;
+	void Register(SocketEvents *se) override;
 	void Unregister(SocketEvents *se) override;
 	void ChangeEvents(SocketEvents *se, int events) override;
 
@@ -131,7 +116,7 @@ protected:
 class SocketEventEngineEpoll : public SocketEventEngine
 {
 public:
-	virtual void Register(SocketEvents *se, Object *lifesupportObject);
+	virtual void Register(SocketEvents *se);
 	virtual void Unregister(SocketEvents *se);
 	virtual void ChangeEvents(SocketEvents *se, int events);
 

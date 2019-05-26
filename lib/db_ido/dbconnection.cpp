@@ -1,24 +1,7 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #include "db_ido/dbconnection.hpp"
-#include "db_ido/dbconnection.tcpp"
+#include "db_ido/dbconnection-ti.cpp"
 #include "db_ido/dbvalue.hpp"
 #include "icinga/icingaapplication.hpp"
 #include "icinga/host.hpp"
@@ -392,7 +375,26 @@ bool DbConnection::GetStatusUpdate(const DbObject::Ptr& dbobj) const
 
 void DbConnection::UpdateObject(const ConfigObject::Ptr& object)
 {
-	if (!GetConnected() || Application::IsShuttingDown())
+	bool isShuttingDown = Application::IsShuttingDown();
+	bool isRestarting = Application::IsRestarting();
+
+#ifdef I2_DEBUG
+	if (isShuttingDown || isRestarting) {
+		//Log(LogDebug, "DbConnection")
+		//	<< "Updating object '" << object->GetName() << "' \t\t active '" << Convert::ToLong(object->IsActive())
+		//	<< "' shutting down '" << Convert::ToLong(isShuttingDown) << "' restarting '" << Convert::ToLong(isRestarting) << "'.";
+	}
+#endif /* I2_DEBUG */
+
+	/* Wait until a database connection is established on reconnect. */
+	if (!GetConnected())
+		return;
+
+	/* Don't update inactive objects during shutdown/reload/restart.
+	 * They would be marked as deleted. This gets triggered with ConfigObject::StopObjects().
+	 * During startup/reconnect this is fine, the handler is not active there.
+	 */
+	if (isShuttingDown || isRestarting)
 		return;
 
 	DbObject::Ptr dbobj = DbObject::GetOrCreateByObject(object);
@@ -419,7 +421,10 @@ void DbConnection::UpdateObject(const ConfigObject::Ptr& object)
 				dbobj->SendConfigUpdateLight();
 			}
 		} else if (!active) {
-			/* Deactivate the deleted object no matter
+			/* This may happen on reload/restart actions too
+			 * and is blocked above already.
+			 *
+			 * Deactivate the deleted object no matter
 			 * which state it had in the database.
 			 */
 			DeactivateObject(dbobj);
@@ -452,8 +457,8 @@ void DbConnection::ValidateFailoverTimeout(const Lazy<double>& lvalue, const Val
 {
 	ObjectImpl<DbConnection>::ValidateFailoverTimeout(lvalue, utils);
 
-	if (lvalue() < 60)
-		BOOST_THROW_EXCEPTION(ValidationError(this, { "failover_timeout" }, "Failover timeout minimum is 60s."));
+	if (lvalue() < 30)
+		BOOST_THROW_EXCEPTION(ValidationError(this, { "failover_timeout" }, "Failover timeout minimum is 30s."));
 }
 
 void DbConnection::ValidateCategories(const Lazy<Array::Ptr>& lvalue, const ValidationUtils& utils)

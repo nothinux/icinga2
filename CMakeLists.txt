@@ -1,22 +1,7 @@
-# Icinga 2
-# Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)
-#
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation
-# Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
+# Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+
 
 cmake_minimum_required(VERSION 2.8.8)
-set(BOOST_MIN_VERSION "1.48.0")
+set(BOOST_MIN_VERSION "1.66.0")
 
 project(icinga2)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -24,8 +9,8 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/third-party/cmake")
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING
-      "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
-      FORCE)
+    "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
+    FORCE)
 endif()
 
 option(ICINGA2_WITH_MYSQL "Build the MySQL IDO module" ON)
@@ -35,23 +20,53 @@ option(ICINGA2_WITH_COMPAT "Build the compat module" ON)
 option(ICINGA2_WITH_LIVESTATUS "Build the Livestatus module" ON)
 option(ICINGA2_WITH_NOTIFICATION "Build the notification module" ON)
 option(ICINGA2_WITH_PERFDATA "Build the perfdata module" ON)
-option(ICINGA2_WITH_STUDIO "Build the Icinga Studio application" OFF)
 option(ICINGA2_WITH_TESTS "Run unit tests" ON)
 
-file(STRINGS icinga2.spec VERSION_LINE REGEX "^Version: ")
-string(REPLACE "Version: " "" ICINGA2_VERSION ${VERSION_LINE})
+option (USE_SYSTEMD
+ "Configure icinga as native systemd service instead of a SysV initscript" OFF)
+
+set(HAVE_SYSTEMD ${USE_SYSTEMD})
 
 include(GNUInstallDirs)
 include(InstallConfig)
+include(SetFullDir)
 
 set(ICINGA2_USER "icinga" CACHE STRING "Icinga 2 user")
 set(ICINGA2_GROUP "icinga" CACHE STRING "Icinga 2 group")
 set(ICINGA2_COMMAND_GROUP "icingacmd" CACHE STRING "Icinga 2 command group")
-set(ICINGA2_RUNDIR "${CMAKE_INSTALL_FULL_LOCALSTATEDIR}/run" CACHE STRING "/run directory")
 set(ICINGA2_PLUGINDIR "/usr/lib/nagios/plugins" CACHE STRING "Path for the check plugins")
 set(ICINGA2_GIT_VERSION_INFO ON CACHE BOOL "Whether to use git describe")
 set(ICINGA2_UNITY_BUILD ON CACHE BOOL "Whether to perform a unity build")
 set(ICINGA2_LTO_BUILD OFF CACHE BOOL "Whether to use LTO")
+
+set(ICINGA2_CONFIGDIR "${CMAKE_INSTALL_SYSCONFDIR}/icinga2" CACHE FILEPATH "Main config directory, e.g. /etc/icinga2")
+set(ICINGA2_CACHEDIR "${CMAKE_INSTALL_LOCALSTATEDIR}/cache/icinga2" CACHE FILEPATH "Directory for cache files, e.g. /var/cache/icinga2")
+set(ICINGA2_DATADIR "${CMAKE_INSTALL_LOCALSTATEDIR}/lib/icinga2" CACHE FILEPATH "Data directory for the daemon, e.g. /var/lib/icinga2")
+set(ICINGA2_LOGDIR "${CMAKE_INSTALL_LOCALSTATEDIR}/log/icinga2" CACHE FILEPATH "Logging directory, e.g. /var/log/icinga2")
+set(ICINGA2_SPOOLDIR "${CMAKE_INSTALL_LOCALSTATEDIR}/spool/icinga2" CACHE FILEPATH "Spooling directory, e.g. /var/spool/icinga2")
+set(ICINGA2_RUNDIR "${CMAKE_INSTALL_LOCALSTATEDIR}/run" CACHE STRING "/run directory (deprecated, please use ICINGA2_INITRUNDIR)")
+set(ICINGA2_INITRUNDIR "${ICINGA2_RUNDIR}/icinga2" CACHE FILEPATH "Runtime data for the init system, e.g. /run/icinga2")
+
+set(ICINGA2_PKGDATADIR "${CMAKE_INSTALL_DATADIR}/icinga2" CACHE FILEPATH "Installed data, e.g. /usr/share/icinga2")
+set(ICINGA2_INCLUDEDIR "${ICINGA2_PKGDATADIR}/include" CACHE FILEPATH "Include directory for the ITL, e.g. /usr/share/icinga2/include")
+
+# ensure absolute paths
+set_full_dir(ICINGA2_FULL_CONFIGDIR "${ICINGA2_CONFIGDIR}")
+set_full_dir(ICINGA2_FULL_CACHEDIR "${ICINGA2_CACHEDIR}")
+set_full_dir(ICINGA2_FULL_DATADIR "${ICINGA2_DATADIR}")
+set_full_dir(ICINGA2_FULL_LOGDIR "${ICINGA2_LOGDIR}")
+set_full_dir(ICINGA2_FULL_SPOOLDIR "${ICINGA2_SPOOLDIR}")
+set_full_dir(ICINGA2_FULL_RUNDIR "${ICINGA2_RUNDIR}")
+set_full_dir(ICINGA2_FULL_INITRUNDIR "${ICINGA2_INITRUNDIR}")
+set_full_dir(ICINGA2_FULL_PKGDATADIR "${ICINGA2_PKGDATADIR}")
+set_full_dir(ICINGA2_FULL_INCLUDEDIR "${ICINGA2_INCLUDEDIR}")
+
+set(LOGROTATE_DIR "${CMAKE_INSTALL_SYSCONFDIR}/logrotate.d" CACHE STRING "Location of logrotate configs, e.g. /etc/logrotate.d")
+set(BASHCOMPLETION_DIR "${CMAKE_INSTALL_SYSCONFDIR}/bash_completion.d" CACHE STRING "Location of bash_completion files, e.g. /etc/bash_completion.d")
+
+if(NOT WIN32)
+  set(ICINGA2_SYSCONFIGFILE "${CMAKE_INSTALL_SYSCONFDIR}/sysconfig/icinga2" CACHE PATH "where to store configuation for the init system, defaults to /etc/sysconfig/icinga2")
+endif()
 
 site_name(ICINGA2_BUILD_HOST_NAME)
 set(ICINGA2_BUILD_COMPILER_NAME "${CMAKE_CXX_COMPILER_ID}")
@@ -64,11 +79,10 @@ endif()
 set(ICINGA2_BUILD_COMPILER_VERSION "${CMAKE_CXX_COMPILER_VERSION}")
 
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/COPYING" ICINGA2_LICENSE_GPL)
-file(READ "${CMAKE_CURRENT_SOURCE_DIR}/COPYING.Exceptions" ICINGA2_LICENSE_ADDITIONS)
 set(ICINGA2_LICENSE "${ICINGA2_LICENSE_GPL}\n\n---\n\n${ICINGA2_LICENSE_ADDITIONS}")
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/LICENSE.txt" ${ICINGA2_LICENSE})
 
-file(STRINGS icinga2.spec SPEC_VERSION REGEX "^Version:")
+file(STRINGS VERSION SPEC_VERSION REGEX "^Version:")
 string(LENGTH "${SPEC_VERSION}" SPEC_VERSION_LENGTH)
 math(EXPR SPEC_VERSION_LENGTH "${SPEC_VERSION_LENGTH} - 9")
 string(SUBSTRING ${SPEC_VERSION} 9 ${SPEC_VERSION_LENGTH} SPEC_VERSION)
@@ -81,21 +95,42 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/icinga-version.h.force)
   configure_file(icinga-version.h.force ${CMAKE_CURRENT_BINARY_DIR}/icinga-version.h COPYONLY)
 else()
   if(NOT ICINGA2_GIT_VERSION_INFO OR GIT_VERSION MATCHES "-NOTFOUND$")
-    file(STRINGS icinga2.spec SPEC_REVISION REGEX "^%define revision ")
+    file(STRINGS VERSION SPEC_REVISION REGEX "^Revision: ")
     string(LENGTH "${SPEC_REVISION}" SPEC_REVISION_LENGTH)
-    math(EXPR SPEC_REVISION_LENGTH "${SPEC_REVISION_LENGTH} - 17")
-    string(SUBSTRING ${SPEC_REVISION} 17 ${SPEC_REVISION_LENGTH} SPEC_REVISION)
+    math(EXPR SPEC_REVISION_LENGTH "${SPEC_REVISION_LENGTH} - 10")
+    string(SUBSTRING ${SPEC_REVISION} 10 ${SPEC_REVISION_LENGTH} SPEC_REVISION)
 
     set(GIT_VERSION "r${SPEC_VERSION}-${SPEC_REVISION}")
+    set(ICINGA2_VERSION "${SPEC_VERSION}")
+  else()
+    # use GIT version as ICINGA2_VERSION
+    string(REGEX REPLACE "^[rv]" "" ICINGA2_VERSION "${GIT_VERSION}")
   endif()
   configure_file(icinga-version.h.cmake icinga-version.h)
 endif()
 
+# NuGet on Windows requires a semantic versioning, example: 2.10.4.123 (only 4 element, only numeric)
+string(REGEX REPLACE "-([0-9]+).*$" ".\\1" ICINGA2_VERSION_SAFE "${ICINGA2_VERSION}")
+
 if(WIN32)
   set(Boost_USE_STATIC_LIBS ON)
-  add_definitions(-DBOOST_ALL_NO_LIB)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /bigobj")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /bigobj")
+  # Disabled for linking issues for newer Boost versions, they link against Windows SDKs
+  #add_definitions(-DBOOST_ALL_NO_LIB)
+
+  # Disable optimization for Boost::context
+  # https://www.boost.org/doc/libs/1_69_0/libs/context/doc/html/context/overview.html
+  # https://docs.microsoft.com/en-us/cpp/build/reference/gl-whole-program-optimization?view=vs-2017
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /bigobj /GL- /EHs")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /bigobj /GL- /EHs")
+
+  # detect if 32-bit target
+  if(CMAKE_VS_PLATFORM_NAME STREQUAL "Win32")
+    # SAFESEH is not supported in Boost on Windows x86
+    # maybe it is when Boost is compiled with it...
+    # https://lists.boost.org/Archives/boost/2013/10/206720.php
+    # https://docs.microsoft.com/en-us/cpp/build/reference/safeseh-image-has-safe-exception-handlers?view=vs-2017
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SAFESEH:NO")
+  endif()
 endif()
 
 if(NOT DEFINED LOGROTATE_HAS_SU)
@@ -115,7 +150,14 @@ if(LOGROTATE_HAS_SU)
   set(LOGROTATE_USE_SU "\n\tsu ${ICINGA2_USER} ${ICINGA2_GROUP}")
 endif()
 
-find_package(Boost ${BOOST_MIN_VERSION} COMPONENTS thread system program_options regex REQUIRED)
+find_package(Boost ${BOOST_MIN_VERSION} COMPONENTS context coroutine date_time filesystem thread system program_options regex REQUIRED)
+
+# Boost.Coroutine2 (the successor of Boost.Coroutine)
+# (1) doesn't even exist in old Boost versions and
+# (2) isn't supported by ASIO, yet.
+add_definitions(-DBOOST_COROUTINES_NO_DEPRECATION_WARNING)
+
+add_definitions(-DBOOST_FILESYSTEM_NO_DEPRECATED)
 
 link_directories(${Boost_LIBRARY_DIRS})
 include_directories(${Boost_INCLUDE_DIRS})
@@ -123,13 +165,16 @@ include_directories(${Boost_INCLUDE_DIRS})
 find_package(OpenSSL REQUIRED)
 include_directories(${OPENSSL_INCLUDE_DIR})
 
-find_package(YAJL)
+set(base_DEPS ${CMAKE_DL_LIBS} ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES})
+set(base_OBJS $<TARGET_OBJECTS:mmatch> $<TARGET_OBJECTS:socketpair> $<TARGET_OBJECTS:base>)
 
-if(NOT YAJL_FOUND)
-  include_directories(${icinga2_BINARY_DIR}/third-party/yajl/include)
-  link_directories(${icinga2_BINARY_DIR}/third-party/yajl)
-  set(YAJL_LIBRARIES "yajl")
-endif()
+# JSON
+find_package(JSON)
+include_directories(${JSON_INCLUDE})
+
+# UTF8CPP
+find_package(UTF8CPP)
+include_directories(${UTF8CPP_INCLUDE})
 
 find_package(Editline)
 set(HAVE_EDITLINE "${EDITLINE_FOUND}")
@@ -142,7 +187,35 @@ include_directories(
   ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR}/lib
 )
 
+if(HAVE_LIBEXECINFO)
+  list(APPEND base_DEPS execinfo)
+endif()
+
+if(UNIX OR CYGWIN)
+  list(APPEND base_OBJS $<TARGET_OBJECTS:execvpe>)
+endif()
+
+if(HAVE_SYSTEMD)
+  list(APPEND base_DEPS systemd)
+endif()
+
+
+if(EDITLINE_FOUND)
+  list(APPEND base_DEPS ${EDITLINE_LIBRARIES})
+  include_directories(${EDITLINE_INCLUDE_DIR})
+endif()
+
+if(TERMCAP_FOUND)
+  list(APPEND base_DEPS ${TERMCAP_LIBRARIES})
+  include_directories(${TERMCAP_INCLUDE_DIR})
+endif()
+
+if(WIN32)
+  list(APPEND base_DEPS ws2_32 dbghelp shlwapi msi)
+endif()
+
 set(CMAKE_MACOSX_RPATH 1)
+set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_RPATH};${CMAKE_INSTALL_FULL_LIBDIR}/icinga2")
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Qunused-arguments -fcolor-diagnostics")
@@ -175,21 +248,6 @@ if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -pthread")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -pthread")
   endif()
-endif()
-
-if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-  function(add_whole_static_library target library)
-    target_link_libraries(${target} -force_load ${library})
-  endfunction()
-elseif(MSVC)
-  function(add_whole_static_library target library)
-    target_link_libraries(${target} ${library})
-    set_property(TARGET ${target} APPEND_STRING PROPERTY LINK_FLAGS "/wholearchive:${library} ")
-  endfunction()
-else()
-  function(add_whole_static_library target library)
-    target_link_libraries(${target} -Wl,--whole-archive ${library} -Wl,--no-whole-archive)
-  endfunction()
 endif()
 
 include(CheckCXXCompilerFlag)
@@ -253,6 +311,11 @@ if(ICINGA2_LTO_BUILD)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -flto")
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -flto")
+
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.9.0) AND NOT OPENBSD)
+      set(CMAKE_AR "gcc-ar")
+      set(CMAKE_RANLIB "gcc-ranlib")
+    endif()
   endif()
 endif()
 
@@ -313,7 +376,7 @@ endif()
 configure_file(config.h.cmake ${CMAKE_CURRENT_BINARY_DIR}/config.h ESCAPE_QUOTES)
 
 install(
-  FILES README.md COPYING COPYING.Exceptions AUTHORS CHANGELOG.md NEWS
+  FILES README.md COPYING AUTHORS CHANGELOG.md NEWS
   DESTINATION ${CMAKE_INSTALL_DOCDIR}
 )
 
@@ -337,29 +400,25 @@ if(MSVC)
   add_subdirectory(icinga-installer)
 endif()
 
-if(ICINGA2_WITH_STUDIO)
-  add_subdirectory(icinga-studio)
-endif()
-
 if(ICINGA2_WITH_TESTS)
   add_subdirectory(test)
 endif()
 
 set(CPACK_PACKAGE_NAME "Icinga 2")
-set(CPACK_PACKAGE_VENDOR "Icinga Development Team")
-set(CPACK_PACKAGE_VERSION ${ICINGA2_VERSION})
+set(CPACK_PACKAGE_VENDOR "Icinga GmbH")
+set(CPACK_PACKAGE_VERSION ${ICINGA2_VERSION_SAFE})
 set(CPACK_PACKAGE_INSTALL_DIRECTORY "ICINGA2")
 set(CPACK_PACKAGE_ICON "${CMAKE_CURRENT_SOURCE_DIR}/icinga-app\\\\icinga.ico")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_BINARY_DIR}/LICENSE.txt")
 
-set(CPACK_PACKAGE_EXECUTABLES "Icinga2SetupAgent;Icinga 2 Agent Wizard;icinga-studio;Icinga Studio")
+set(CPACK_PACKAGE_EXECUTABLES "Icinga2SetupAgent;Icinga 2 Agent Wizard")
 set(CPACK_WIX_PRODUCT_ICON "${CMAKE_CURRENT_SOURCE_DIR}/icinga-app\\\\icinga.ico")
 set(CPACK_WIX_UPGRADE_GUID "52F2BEAA-4DF0-4C3E-ABDC-C0F61DE4DF8A")
-set(CPACK_WIX_EXTENSIONS "WixUtilExtension")
 set(CPACK_WIX_UI_BANNER "${CMAKE_CURRENT_SOURCE_DIR}/icinga-installer/bannrbmp.bmp")
 set(CPACK_WIX_UI_DIALOG "${CMAKE_CURRENT_SOURCE_DIR}/icinga-installer/dlgbmp.bmp")
 set(CPACK_WIX_PATCH_FILE "${CMAKE_CURRENT_BINARY_DIR}/icinga-installer/icinga2.wixpatch.Debug")
 set(CPACK_WIX_PATCH_FILE "${CMAKE_CURRENT_BINARY_DIR}/icinga-installer/icinga2.wixpatch")
+set(CPACK_WIX_EXTENSIONS "WixUtilExtension" "WixNetFxExtension")
 
 set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION "sbin")
 set(CMAKE_INSTALL_UCRT_LIBRARIES TRUE)
@@ -367,11 +426,11 @@ include(InstallRequiredSystemLibraries)
 
 if(WIN32)
   if(CMAKE_VS_PLATFORM_NAME STREQUAL "x64")
-    set(NSCP_URL "https://github.com/mickem/nscp/releases/download/0.5.0.62/NSCP-0.5.0.62-x64.msi")
-    set(NSCP_SHA256 "1854de86ad4fda3391f273de0f9985b702c014bdec01b26ad28a1343177f537f")
+    set(NSCP_URL "https://github.com/mickem/nscp/releases/download/0.5.2.39/NSCP-0.5.2.39-x64.msi")
+    set(NSCP_SHA256 "dfe93c293f30586b02510d8b7884e4e177b93a5fead8b5dc6de8103532e6e159")
   else()
-    set(NSCP_URL "https://github.com/mickem/nscp/releases/download/0.5.0.62/NSCP-0.5.0.62-Win32.msi")
-    set(NSCP_SHA256 "2186b60d588fa0811344ce709332f9c63670019c62ae92eae49698bf76205a95")
+    set(NSCP_URL "https://github.com/mickem/nscp/releases/download/0.5.2.39/NSCP-0.5.2.39-Win32.msi")
+    set(NSCP_SHA256 "ca6a67fb01c1468f2b510fd2f9eb0750887db3fb49a0302732c1421c85c6627c")
   endif()
 
   set(NSCP_SHA256SUM "")

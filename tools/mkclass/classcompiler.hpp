@@ -1,21 +1,4 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #ifndef CLASSCOMPILER_H
 #define CLASSCOMPILER_H
@@ -76,7 +59,8 @@ enum FieldAttribute
 	FANoUserView = 2048,
 	FADeprecated = 4096,
 	FAGetVirtual = 8192,
-	FASetVirtual = 16384
+	FASetVirtual = 16384,
+	FAActivationPriority = 32768
 };
 
 struct FieldType
@@ -122,6 +106,7 @@ struct Field
 	std::string NavigationName;
 	std::string NavigateAccessor;
 	bool PureNavigateAccessor{false};
+	int Priority{0};
 
 	inline std::string GetFriendlyName() const
 	{
@@ -167,6 +152,7 @@ struct Klass
 	int Attributes;
 	std::vector<Field> Fields;
 	std::vector<std::string> LoadDependencies;
+	int ActivationPriority{0};
 };
 
 enum RuleAttribute

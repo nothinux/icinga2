@@ -1,25 +1,8 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #include "icinga/compatutility.hpp"
 #include "compat/checkresultreader.hpp"
-#include "compat/checkresultreader.tcpp"
+#include "compat/checkresultreader-ti.cpp"
 #include "icinga/service.hpp"
 #include "icinga/pluginutility.hpp"
 #include "icinga/icingaapplication.hpp"
@@ -60,6 +43,9 @@ void CheckResultReader::Start(bool runtimeCreated)
 
 	Log(LogInformation, "CheckResultReader")
 		<< "'" << GetName() << "' started.";
+
+	Log(LogWarning, "CheckResultReader")
+		<< "This feature is DEPRECATED and will be removed in future releases. Check the roadmap at https://github.com/Icinga/icinga2/milestones";
 
 #ifndef _WIN32
 	m_ReadTimer = new Timer();
@@ -121,17 +107,9 @@ void CheckResultReader::ProcessCheckResultFile(const String& path) const
 	}
 
 	/* Remove the checkresult files. */
-	if (unlink(path.CStr()) < 0)
-		BOOST_THROW_EXCEPTION(posix_error()
-			<< boost::errinfo_api_function("unlink")
-			<< boost::errinfo_errno(errno)
-			<< boost::errinfo_file_name(path));
+	Utility::Remove(path);
 
-	if (unlink(crfile.CStr()) < 0)
-		BOOST_THROW_EXCEPTION(posix_error()
-			<< boost::errinfo_api_function("unlink")
-			<< boost::errinfo_errno(errno)
-			<< boost::errinfo_file_name(crfile));
+	Utility::Remove(crfile);
 
 	Checkable::Ptr checkable;
 

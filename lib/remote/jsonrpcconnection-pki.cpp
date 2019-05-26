@@ -1,21 +1,4 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #include "remote/jsonrpcconnection.hpp"
 #include "remote/apilistener.hpp"
@@ -30,6 +13,8 @@
 #include <boost/thread/once.hpp>
 #include <boost/regex.hpp>
 #include <fstream>
+#include <openssl/ssl.h>
+#include <openssl/x509.h>
 
 using namespace icinga;
 
@@ -40,9 +25,6 @@ REGISTER_APIFUNCTION(UpdateCertificate, pki, &UpdateCertificateHandler);
 
 Value RequestCertificateHandler(const MessageOrigin::Ptr& origin, const Dictionary::Ptr& params)
 {
-	if (!params)
-		return Empty;
-
 	String certText = params->Get("cert_request");
 
 	std::shared_ptr<X509> cert;
@@ -50,10 +32,21 @@ Value RequestCertificateHandler(const MessageOrigin::Ptr& origin, const Dictiona
 	Dictionary::Ptr result = new Dictionary();
 
 	/* Use the presented client certificate if not provided. */
-	if (certText.IsEmpty())
-		cert = origin->FromClient->GetStream()->GetPeerCertificate();
-	else
+	if (certText.IsEmpty()) {
+		auto stream (origin->FromClient->GetStream());
+		cert = stream->next_layer().GetPeerCertificate();
+	} else {
 		cert = StringToCertificate(certText);
+	}
+
+	if (!cert) {
+		Log(LogWarning, "JsonRpcConnection") << "No certificate or CSR received";
+
+		result->Set("status_code", 1);
+		result->Set("error", "No certificate or CSR received.");
+
+		return result;
+	}
 
 	ApiListener::Ptr listener = ApiListener::GetInstance();
 	std::shared_ptr<X509> cacert = GetX509Certificate(listener->GetDefaultCaPath());
@@ -79,9 +72,9 @@ Value RequestCertificateHandler(const MessageOrigin::Ptr& origin, const Dictiona
 		if (X509_cmp_time(X509_get_notBefore(cert.get()), &forceRenewalEnd) != -1 && X509_cmp_time(X509_get_notAfter(cert.get()), &renewalStart) != -1) {
 
 			Log(LogInformation, "JsonRpcConnection")
-				<< "The certificate for CN '" << cn << "' cannot be renewed yet.";
+				<< "The certificate for CN '" << cn << "' is valid and uptodate. Skipping automated renewal.";
 			result->Set("status_code", 1);
-			result->Set("error", "The certificate for CN '" + cn + "' cannot be renewed yet.");
+			result->Set("error", "The certificate for CN '" + cn + "' is valid and uptodate. Skipping automated renewal.");
 			return result;
 		}
 	}
@@ -132,7 +125,7 @@ Value RequestCertificateHandler(const MessageOrigin::Ptr& origin, const Dictiona
 				{ "method", "pki::UpdateCertificate" },
 				{ "params", result }
 			});
-			JsonRpc::SendMessage(client->GetStream(), message);
+			client->SendMessage(message);
 
 			return result;
 		}
@@ -165,7 +158,7 @@ Value RequestCertificateHandler(const MessageOrigin::Ptr& origin, const Dictiona
 
 		if (ticket != realTicket) {
 			Log(LogWarning, "JsonRpcConnection")
-				<< "Ticket for CN '" << cn << "' is invalid.";
+				<< "Ticket '" << ticket << "' for CN '" << cn << "' is invalid.";
 
 			result->Set("status_code", 1);
 			result->Set("error", "Invalid ticket for CN '" + cn + "'.");
@@ -203,7 +196,7 @@ Value RequestCertificateHandler(const MessageOrigin::Ptr& origin, const Dictiona
 		{ "method", "pki::UpdateCertificate" },
 		{ "params", result }
 	});
-	JsonRpc::SendMessage(client->GetStream(), message);
+	client->SendMessage(message);
 
 	return result;
 
@@ -266,7 +259,7 @@ void JsonRpcConnection::SendCertificateRequest(const JsonRpcConnection::Ptr& acl
 	 * or b) the local zone and all parents.
 	 */
 	if (aclient)
-		JsonRpc::SendMessage(aclient->GetStream(), message);
+		aclient->SendMessage(message);
 	else
 		listener->RelayMessage(origin, Zone::GetLocalZone(), message, false);
 }
@@ -341,16 +334,7 @@ Value UpdateCertificateHandler(const MessageOrigin::Ptr& origin, const Dictionar
 	cafp << ca;
 	cafp.close();
 
-#ifdef _WIN32
-	_unlink(caPath.CStr());
-#endif /* _WIN32 */
-
-	if (rename(tempCaPath.CStr(), caPath.CStr()) < 0) {
-		BOOST_THROW_EXCEPTION(posix_error()
-			<< boost::errinfo_api_function("rename")
-			<< boost::errinfo_errno(errno)
-			<< boost::errinfo_file_name(tempCaPath));
-	}
+	Utility::RenameFile(tempCaPath, caPath);
 
 	/* Update signed certificate. */
 	String certPath = listener->GetDefaultCertPath();
@@ -363,26 +347,12 @@ Value UpdateCertificateHandler(const MessageOrigin::Ptr& origin, const Dictionar
 	certfp << cert;
 	certfp.close();
 
-#ifdef _WIN32
-	_unlink(certPath.CStr());
-#endif /* _WIN32 */
-
-	if (rename(tempCertPath.CStr(), certPath.CStr()) < 0) {
-		BOOST_THROW_EXCEPTION(posix_error()
-			<< boost::errinfo_api_function("rename")
-			<< boost::errinfo_errno(errno)
-			<< boost::errinfo_file_name(tempCertPath));
-	}
+	Utility::RenameFile(tempCertPath, certPath);
 
 	/* Remove ticket for successful signing request. */
 	String ticketPath = ApiListener::GetCertsDir() + "/ticket";
 
-	if (unlink(ticketPath.CStr()) < 0 && errno != ENOENT) {
-		BOOST_THROW_EXCEPTION(posix_error()
-			<< boost::errinfo_api_function("unlink")
-			<< boost::errinfo_errno(errno)
-			<< boost::errinfo_file_name(ticketPath));
-	}
+	Utility::Remove(ticketPath);
 
 	/* Update the certificates at runtime and reconnect all endpoints. */
 	Log(LogInformation, "JsonRpcConnection")

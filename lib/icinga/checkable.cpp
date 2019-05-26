@@ -1,24 +1,7 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #include "icinga/checkable.hpp"
-#include "icinga/checkable.tcpp"
+#include "icinga/checkable-ti.cpp"
 #include "icinga/host.hpp"
 #include "icinga/service.hpp"
 #include "base/objectlock.hpp"
@@ -57,14 +40,16 @@ void Checkable::OnAllConfigLoaded()
 	if (endpoint) {
 		Zone::Ptr checkableZone = static_pointer_cast<Zone>(GetZone());
 
-		if (!checkableZone)
-			checkableZone = Zone::GetLocalZone();
+		if (checkableZone) {
+			Zone::Ptr cmdZone = endpoint->GetZone();
 
-		Zone::Ptr cmdZone = endpoint->GetZone();
-
-		if (checkableZone && cmdZone != checkableZone && cmdZone->GetParent() != checkableZone) {
+			if (cmdZone != checkableZone && cmdZone->GetParent() != checkableZone) {
+				BOOST_THROW_EXCEPTION(ValidationError(this, { "command_endpoint" },
+					"Command endpoint must be in zone '" + checkableZone->GetName() + "' or in a direct child zone thereof."));
+			}
+		} else {
 			BOOST_THROW_EXCEPTION(ValidationError(this, { "command_endpoint" },
-				"Command endpoint must be in zone '" + checkableZone->GetName() + "' or in a direct child zone thereof."));
+				"Command endpoint must not be set."));
 		}
 	}
 }
@@ -73,8 +58,11 @@ void Checkable::Start(bool runtimeCreated)
 {
 	double now = Utility::GetTime();
 
-	if (GetNextCheck() < now + 300)
-		UpdateNextCheck();
+	if (GetNextCheck() < now + 60) {
+		double delta = std::min(GetCheckInterval(), 60.0);
+		delta *= (double)std::rand() / RAND_MAX;
+		SetNextCheck(now + delta);
+	}
 
 	ObjectImpl<Checkable>::Start(runtimeCreated);
 }
@@ -151,6 +139,16 @@ int Checkable::GetSeverity() const
 	return 0;
 }
 
+bool Checkable::GetProblem() const
+{
+	return !IsStateOK(GetStateRaw());
+}
+
+bool Checkable::GetHandled() const
+{
+	return GetProblem() && (IsInDowntime() || IsAcknowledged());
+}
+
 void Checkable::NotifyFixedDowntimeStart(const Downtime::Ptr& downtime)
 {
 	if (!downtime->GetFixed())
@@ -193,6 +191,14 @@ void Checkable::ValidateCheckInterval(const Lazy<double>& lvalue, const Validati
 
 	if (lvalue() <= 0)
 		BOOST_THROW_EXCEPTION(ValidationError(this, { "check_interval" }, "Interval must be greater than 0."));
+}
+
+void Checkable::ValidateRetryInterval(const Lazy<double>& lvalue, const ValidationUtils& utils)
+{
+	ObjectImpl<Checkable>::ValidateRetryInterval(lvalue, utils);
+
+	if (lvalue() <= 0)
+		BOOST_THROW_EXCEPTION(ValidationError(this, { "retry_interval" }, "Interval must be greater than 0."));
 }
 
 void Checkable::ValidateMaxCheckAttempts(const Lazy<int>& lvalue, const ValidationUtils& utils)

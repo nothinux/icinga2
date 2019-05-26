@@ -1,21 +1,4 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #include "db_ido/userdbobject.hpp"
 #include "db_ido/usergroupdbobject.hpp"
@@ -51,16 +34,16 @@ Dictionary::Ptr UserDbObject::GetConfigFields() const
 		{ "host_notifications_enabled", user->GetEnableNotifications() },
 		{ "service_notifications_enabled", user->GetEnableNotifications() },
 		{ "can_submit_commands", 1 },
-		{ "notify_service_recovery", (typeFilter & NotificationRecovery) != 0 },
-		{ "notify_service_warning", (stateFilter & StateFilterWarning) != 0 },
-		{ "notify_service_unknown", (stateFilter & StateFilterUnknown) != 0 },
-		{ "notify_service_critical", (stateFilter & StateFilterCritical) != 0 },
-		{ "notify_service_flapping", (typeFilter & (NotificationFlappingStart | NotificationFlappingEnd)) != 0 },
-		{ "notify_service_downtime", (typeFilter & (NotificationDowntimeStart | NotificationDowntimeEnd | NotificationDowntimeRemoved)) != 0 },
-		{ "notify_host_recovery", (typeFilter & NotificationRecovery) != 0 },
-		{ "notify_host_down", (stateFilter & StateFilterDown) != 0 },
-		{ "notify_host_flapping", (typeFilter & (NotificationFlappingStart | NotificationFlappingEnd)) != 0 },
-		{ "notify_host_downtime", (typeFilter & (NotificationDowntimeStart | NotificationDowntimeEnd | NotificationDowntimeRemoved)) != 0 }
+		{ "notify_service_recovery", (typeFilter & NotificationRecovery) ? 1 : 0 },
+		{ "notify_service_warning", (stateFilter & StateFilterWarning) ? 1 : 0 },
+		{ "notify_service_unknown", (stateFilter & StateFilterUnknown) ? 1 : 0 },
+		{ "notify_service_critical", (stateFilter & StateFilterCritical) ? 1 : 0 },
+		{ "notify_service_flapping", (typeFilter & (NotificationFlappingStart | NotificationFlappingEnd)) ? 1 : 0 },
+		{ "notify_service_downtime", (typeFilter & (NotificationDowntimeStart | NotificationDowntimeEnd | NotificationDowntimeRemoved)) ? 1 : 0 },
+		{ "notify_host_recovery", (typeFilter & NotificationRecovery) ? 1 : 0 },
+		{ "notify_host_down", (stateFilter & StateFilterDown) ? 1 : 0 },
+		{ "notify_host_flapping", (typeFilter & (NotificationFlappingStart | NotificationFlappingEnd)) ? 1 : 0 },
+		{ "notify_host_downtime", (typeFilter & (NotificationDowntimeStart | NotificationDowntimeEnd | NotificationDowntimeRemoved)) ? 1 : 0 }
 	});
 }
 

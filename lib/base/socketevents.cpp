@@ -1,27 +1,11 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #include "base/socketevents.hpp"
 #include "base/exception.hpp"
 #include "base/logger.hpp"
 #include "base/application.hpp"
 #include "base/scriptglobal.hpp"
+#include "base/utility.hpp"
 #include <boost/thread/once.hpp>
 #include <map>
 #ifdef __linux__
@@ -79,7 +63,7 @@ void SocketEventEngine::WakeUpThread(int sid, bool wait)
 
 void SocketEvents::InitializeEngine()
 {
-	String eventEngine = ScriptGlobal::Get("EventEngine", &Empty);
+	String eventEngine = Configuration::EventEngine;
 
 	if (eventEngine.IsEmpty())
 #ifdef __linux__
@@ -105,18 +89,18 @@ void SocketEvents::InitializeEngine()
 
 	l_SocketIOEngine->Start();
 
-	ScriptGlobal::Set("EventEngine", eventEngine);
+	Configuration::EventEngine = eventEngine;
 }
 
 /**
  * Constructor for the SocketEvents class.
  */
-SocketEvents::SocketEvents(const Socket::Ptr& socket, Object *lifesupportObject)
+SocketEvents::SocketEvents(const Socket::Ptr& socket)
 	: m_ID(m_NextID++), m_FD(socket->GetFD()), m_EnginePrivate(nullptr)
 {
 	boost::call_once(l_SocketIOOnceFlag, &SocketEvents::InitializeEngine);
 
-	Register(lifesupportObject);
+	Register();
 }
 
 SocketEvents::~SocketEvents()
@@ -124,9 +108,9 @@ SocketEvents::~SocketEvents()
 	VERIFY(m_FD == INVALID_SOCKET);
 }
 
-void SocketEvents::Register(Object *lifesupportObject)
+void SocketEvents::Register()
 {
-	l_SocketIOEngine->Register(this, lifesupportObject);
+	l_SocketIOEngine->Register(this);
 }
 
 void SocketEvents::Unregister()

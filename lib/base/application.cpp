@@ -1,24 +1,7 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #include "base/application.hpp"
-#include "base/application.tcpp"
+#include "base/application-ti.cpp"
 #include "base/stacktrace.hpp"
 #include "base/timer.hpp"
 #include "base/logger.hpp"
@@ -31,8 +14,6 @@
 #include "base/convert.hpp"
 #include "base/scriptglobal.hpp"
 #include "base/process.hpp"
-#include <boost/algorithm/string/classification.hpp>
-#include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/exception/errinfo_api_function.hpp>
 #include <boost/exception/errinfo_errno.hpp>
@@ -44,10 +25,12 @@
 #ifdef __linux__
 #include <sys/prctl.h>
 #endif /* __linux__ */
-
 #ifdef _WIN32
 #include <windows.h>
-#endif /* _win32 */
+#endif /* _WIN32 */
+#ifdef HAVE_SYSTEMD
+#include <systemd/sd-daemon.h>
+#endif /* HAVE_SYSTEMD */
 
 using namespace icinga;
 
@@ -90,25 +73,7 @@ void Application::Stop(bool runtimeRemoved)
 	WSACleanup();
 #endif /* _WIN32 */
 
-	// Getting a shutdown-signal when a restart is in progress usually
-	// means that the restart succeeded and the new process wants to take
-	// over. Write the PID of the new process to the pidfile before this
-	// process exits to keep systemd happy.
-	if (l_Restarting) {
-		try {
-			UpdatePidFile(GetPidPath(), m_ReloadProcess);
-		} catch (const std::exception&) {
-			/* abort restart */
-			Log(LogCritical, "Application", "Cannot update PID file. Aborting restart operation.");
-			return;
-		}
-
-		Log(LogDebug, "Application")
-			<< "Keeping pid  '" << m_ReloadProcess << "' open.";
-
-		ClosePidFile(false);
-	} else
-		ClosePidFile(true);
+	ClosePidFile(true);
 
 	ObjectImpl<Application>::Stop(runtimeRemoved);
 }
@@ -156,8 +121,11 @@ void Application::InitializeBase()
 
 	Loader::ExecuteDeferredInitializers();
 
-	/* make sure the thread pool gets initialized */
+	/* Make sure the thread pool gets initialized. */
 	GetTP().Start();
+
+	/* Make sure the timer thread gets initialized. */
+	Timer::Initialize();
 }
 
 void Application::UninitializeBase()
@@ -183,10 +151,10 @@ void Application::SetResourceLimits()
 	rlimit rl;
 
 #	ifdef RLIMIT_NOFILE
-	rlim_t fileLimit = GetRLimitFiles();
+	rlim_t fileLimit = Configuration::RLimitFiles;
 
 	if (fileLimit != 0) {
-		if (fileLimit < GetDefaultRLimitFiles()) {
+		if (fileLimit < (rlim_t)GetDefaultRLimitFiles()) {
 			Log(LogWarning, "Application")
 				<< "The user-specified value for RLimitFiles cannot be smaller than the default value (" << GetDefaultRLimitFiles() << "). Using the default value instead.";
 			fileLimit = GetDefaultRLimitFiles();
@@ -196,17 +164,18 @@ void Application::SetResourceLimits()
 		rl.rlim_max = rl.rlim_cur;
 
 		if (setrlimit(RLIMIT_NOFILE, &rl) < 0)
-			Log(LogNotice, "Application", "Could not adjust resource limit for open file handles (RLIMIT_NOFILE)");
+			Log(LogWarning, "Application")
+			    << "Failed to adjust resource limit for open file handles (RLIMIT_NOFILE) with error \"" << strerror(errno) << "\"";
 #	else /* RLIMIT_NOFILE */
 		Log(LogNotice, "Application", "System does not support adjusting the resource limit for open file handles (RLIMIT_NOFILE)");
 #	endif /* RLIMIT_NOFILE */
 	}
 
 #	ifdef RLIMIT_NPROC
-	rlim_t processLimit = GetRLimitProcesses();
+	rlim_t processLimit = Configuration::RLimitProcesses;
 
 	if (processLimit != 0) {
-		if (processLimit < GetDefaultRLimitProcesses()) {
+		if (processLimit < (rlim_t)GetDefaultRLimitProcesses()) {
 			Log(LogWarning, "Application")
 				<< "The user-specified value for RLimitProcesses cannot be smaller than the default value (" << GetDefaultRLimitProcesses() << "). Using the default value instead.";
 			processLimit = GetDefaultRLimitProcesses();
@@ -216,7 +185,8 @@ void Application::SetResourceLimits()
 		rl.rlim_max = rl.rlim_cur;
 
 		if (setrlimit(RLIMIT_NPROC, &rl) < 0)
-			Log(LogNotice, "Application", "Could not adjust resource limit for number of processes (RLIMIT_NPROC)");
+			Log(LogWarning, "Application")
+			    << "Failed adjust resource limit for number of processes (RLIMIT_NPROC) with error \"" << strerror(errno) << "\"";
 #	else /* RLIMIT_NPROC */
 		Log(LogNotice, "Application", "System does not support adjusting the resource limit for number of processes (RLIMIT_NPROC)");
 #	endif /* RLIMIT_NPROC */
@@ -241,10 +211,10 @@ void Application::SetResourceLimits()
 
 	rlim_t stackLimit;
 
-	stackLimit = GetRLimitStack();
+	stackLimit = Configuration::RLimitStack;
 
 	if (stackLimit != 0) {
-		if (stackLimit < GetDefaultRLimitStack()) {
+		if (stackLimit < (rlim_t)GetDefaultRLimitStack()) {
 			Log(LogWarning, "Application")
 				<< "The user-specified value for RLimitStack cannot be smaller than the default value (" << GetDefaultRLimitStack() << "). Using the default value instead.";
 			stackLimit = GetDefaultRLimitStack();
@@ -256,7 +226,8 @@ void Application::SetResourceLimits()
 			rl.rlim_cur = rl.rlim_max;
 
 		if (setrlimit(RLIMIT_STACK, &rl) < 0)
-			Log(LogNotice, "Application", "Could not adjust resource limit for stack size (RLIMIT_STACK)");
+			Log(LogWarning, "Application")
+			    << "Failed adjust resource limit for stack size (RLIMIT_STACK) with error \"" << strerror(errno) << "\"";
 		else if (set_stack_rlimit) {
 			char **new_argv = static_cast<char **>(malloc(sizeof(char *) * (argc + 2)));
 
@@ -315,47 +286,59 @@ void Application::SetArgV(char **argv)
  */
 void Application::RunEventLoop()
 {
+#ifdef HAVE_SYSTEMD
+	sd_notify(0, "READY=1");
+#endif /* HAVE_SYSTEMD */
+
 	double lastLoop = Utility::GetTime();
 
-mainloop:
-	while (!m_ShuttingDown && !m_RequestRestart) {
-		/* Watches for changes to the system time. Adjusts timers if necessary. */
-		Utility::Sleep(2.5);
+	while (!m_ShuttingDown) {
+		if (m_RequestRestart) {
+			m_RequestRestart = false;         // we are now handling the request, once is enough
 
-		if (m_RequestReopenLogs) {
-			Log(LogNotice, "Application", "Reopening log files");
-			m_RequestReopenLogs = false;
-			OnReopenLogs();
+#ifdef HAVE_SYSTEMD
+			sd_notify(0, "RELOADING=1");
+#endif /* HAVE_SYSTEMD */
+
+			// are we already restarting? ignore request if we already are
+			if (!l_Restarting) {
+				l_Restarting = true;
+				m_ReloadProcess = StartReloadProcess();
+			}
+		} else {
+			/* Watches for changes to the system time. Adjusts timers if necessary. */
+			Utility::Sleep(2.5);
+
+			if (m_RequestReopenLogs) {
+				Log(LogNotice, "Application", "Reopening log files");
+				m_RequestReopenLogs = false;
+				OnReopenLogs();
+			}
+
+			double now = Utility::GetTime();
+			double timeDiff = lastLoop - now;
+
+#ifdef HAVE_SYSTEMD
+			sd_notify(0, "WATCHDOG=1");
+#endif /* HAVE_SYSTEMD */
+
+			if (std::fabs(timeDiff) > 15) {
+				/* We made a significant jump in time. */
+				Log(LogInformation, "Application")
+					<< "We jumped "
+					<< (timeDiff < 0 ? "forward" : "backward")
+					<< " in time: " << std::fabs(timeDiff) << " seconds";
+
+				Timer::AdjustTimers(-timeDiff);
+			}
+
+			lastLoop = now;
 		}
-
-		double now = Utility::GetTime();
-		double timeDiff = lastLoop - now;
-
-		if (std::fabs(timeDiff) > 15) {
-			/* We made a significant jump in time. */
-			Log(LogInformation, "Application")
-				<< "We jumped "
-				<< (timeDiff < 0 ? "forward" : "backward")
-				<< " in time: " << std::fabs(timeDiff) << " seconds";
-
-			Timer::AdjustTimers(-timeDiff);
-		}
-
-		lastLoop = now;
 	}
 
-	if (m_RequestRestart) {
-		m_RequestRestart = false;         // we are now handling the request, once is enough
-
-		// are we already restarting? ignore request if we already are
-		if (l_Restarting)
-			goto mainloop;
-
-		l_Restarting = true;
-		m_ReloadProcess = StartReloadProcess();
-
-		goto mainloop;
-	}
+#ifdef HAVE_SYSTEMD
+	sd_notify(0, "STOPPING=1");
+#endif /* HAVE_SYSTEMD */
 
 	Log(LogInformation, "Application", "Shutting down...");
 
@@ -368,6 +351,11 @@ mainloop:
 bool Application::IsShuttingDown()
 {
 	return m_ShuttingDown;
+}
+
+bool Application::IsRestarting()
+{
+	return l_Restarting;
 }
 
 void Application::OnShutdown()
@@ -397,8 +385,6 @@ static void ReloadProcessCallback(const ProcessResult& pr)
 
 pid_t Application::StartReloadProcess()
 {
-	Log(LogInformation, "Application", "Got reload command: Starting new instance.");
-
 	// prepare arguments
 	ArrayData args;
 	args.push_back(GetExePath(m_ArgV[0]));
@@ -417,9 +403,16 @@ pid_t Application::StartReloadProcess()
 	args.push_back("--validate");
 #endif /* _WIN32 */
 
+	double reloadTimeout = Application::GetReloadTimeout();
+
 	Process::Ptr process = new Process(Process::PrepareCommand(new Array(std::move(args))));
-	process->SetTimeout(300);
+	process->SetTimeout(reloadTimeout);
 	process->Run(&ReloadProcessCallback);
+
+	Log(LogInformation, "Application")
+		<< "Got reload command: Started new instance with PID '"
+		<< (unsigned long)(process->GetPID()) << "' (timeout is "
+		<< reloadTimeout << "s).";
 
 	return process->GetPID();
 }
@@ -487,10 +480,9 @@ String Application::GetExePath(const String& argv0)
 	}
 
 	if (!foundSlash) {
-		const char *pathEnv = getenv("PATH");
-		if (pathEnv) {
-			std::vector<String> paths;
-			boost::algorithm::split(paths, pathEnv, boost::is_any_of(":"));
+		String pathEnv = Utility::GetFromEnvironment("PATH");
+		if (!pathEnv.IsEmpty()) {
+			std::vector<String> paths = String(pathEnv).Split(":");
 
 			bool foundPath = false;
 			for (const String& path : paths) {
@@ -535,34 +527,44 @@ String Application::GetExePath(const String& argv0)
  */
 void Application::DisplayInfoMessage(std::ostream& os, bool skipVersion)
 {
-	os << "Application information:" << "\n";
-
+	/* icinga-app prints its own version information, stack traces need it here. */
 	if (!skipVersion)
-		os << "  Application version: " << GetAppVersion() << "\n";
+		os << "  Application version: " << GetAppVersion() << "\n\n";
 
-	os << "  Installation root: " << GetPrefixDir() << "\n"
-		<< "  Sysconf directory: " << GetSysconfDir() << "\n"
-		<< "  Run directory: " << GetRunDir() << "\n"
-		<< "  Local state directory: " << GetLocalStateDir() << "\n"
-		<< "  Package data directory: " << GetPkgDataDir() << "\n"
-		<< "  State path: " << GetStatePath() << "\n"
-		<< "  Modified attributes path: " << GetModAttrPath() << "\n"
-		<< "  Objects path: " << GetObjectsPath() << "\n"
-		<< "  Vars path: " << GetVarsPath() << "\n"
-		<< "  PID path: " << GetPidPath() << "\n";
-
-	os << "\n"
-		<< "System information:" << "\n"
+	os << "System information:\n"
 		<< "  Platform: " << Utility::GetPlatformName() << "\n"
 		<< "  Platform version: " << Utility::GetPlatformVersion() << "\n"
 		<< "  Kernel: " << Utility::GetPlatformKernel() << "\n"
 		<< "  Kernel version: " << Utility::GetPlatformKernelVersion() << "\n"
 		<< "  Architecture: " << Utility::GetPlatformArchitecture() << "\n";
 
-	os << "\n"
-		<< "Build information:" << "\n"
-		<< "  Compiler: " << ScriptGlobal::Get("BuildCompilerName") << " " << ScriptGlobal::Get("BuildCompilerVersion") << "\n"
-		<< "  Build host: " << ScriptGlobal::Get("BuildHostName") << "\n";
+	Namespace::Ptr systemNS = ScriptGlobal::Get("System");
+
+	os << "\nBuild information:\n"
+		<< "  Compiler: " << systemNS->Get("BuildCompilerName") << " " << systemNS->Get("BuildCompilerVersion") << "\n"
+		<< "  Build host: " << systemNS->Get("BuildHostName") << "\n";
+
+	os << "\nApplication information:\n"
+		<< "\nGeneral paths:\n"
+		<< "  Config directory: " << Configuration::ConfigDir << "\n"
+		<< "  Data directory: " << Configuration::DataDir << "\n"
+		<< "  Log directory: " << Configuration::LogDir << "\n"
+		<< "  Cache directory: " << Configuration::CacheDir << "\n"
+		<< "  Spool directory: " << Configuration::SpoolDir << "\n"
+		<< "  Run directory: " << Configuration::InitRunDir << "\n"
+		<< "\nOld paths (deprecated):\n"
+		<< "  Installation root: " << Configuration::PrefixDir << "\n"
+		<< "  Sysconf directory: " << Configuration::SysconfDir << "\n"
+		<< "  Run directory (base): " << Configuration::RunDir << "\n"
+		<< "  Local state directory: " << Configuration::LocalStateDir << "\n"
+		<< "\nInternal paths:\n"
+		<< "  Package data directory: " << Configuration::PkgDataDir << "\n"
+		<< "  State path: " << Configuration::StatePath << "\n"
+		<< "  Modified attributes path: " << Configuration::ModAttrPath << "\n"
+		<< "  Objects path: " << Configuration::ObjectsPath << "\n"
+		<< "  Vars path: " << Configuration::VarsPath << "\n"
+		<< "  PID path: " << Configuration::PidPath << "\n";
+
 }
 
 /**
@@ -579,7 +581,7 @@ void Application::DisplayBugMessage(std::ostream& os)
 
 String Application::GetCrashReportFilename()
 {
-	return GetLocalStateDir() + "/log/icinga2/crash/report." + Convert::ToString(Utility::GetTime());
+	return Configuration::LogDir + "/crash/report." + Convert::ToString(Utility::GetTime());
 }
 
 
@@ -709,7 +711,46 @@ void Application::SigIntTermHandler(int signum)
  */
 void Application::SigUsr1Handler(int)
 {
+	Log(LogInformation, "Application")
+		<< "Received USR1 signal, reopening application logs.";
+
 	RequestReopenLogs();
+}
+
+/**
+ * Signal handler for SIGUSR2. Hands over PID to child and commits suicide
+ *
+ * @param - The signal number.
+ */
+void Application::SigUsr2Handler(int)
+{
+	Log(LogInformation, "Application", "Reload requested, letting new process take over.");
+#ifdef HAVE_SYSTEMD
+	sd_notifyf(0, "MAINPID=%lu", (unsigned long) m_ReloadProcess);
+#endif /* HAVE_SYSTEMD */
+
+	/* Write the PID of the new process to the pidfile before this
+	 * process exits to keep systemd happy.
+	 */
+	Application::Ptr instance = GetInstance();
+	try {
+		instance->UpdatePidFile(Configuration::PidPath, m_ReloadProcess);
+	} catch (const std::exception&) {
+		/* abort restart */
+		Log(LogCritical, "Application", "Cannot update PID file. Aborting restart operation.");
+		return;
+	}
+
+	instance->ClosePidFile(false);
+
+	/* Ensure to dump the program state on reload. */
+	ConfigObject::StopObjects();
+	instance->OnShutdown();
+
+	Log(LogInformation, "Application")
+		<< "Reload done, parent process shutting down. Child process with PID '" << m_ReloadProcess << "' is taking over.";
+
+	Exit(0);
 }
 
 /**
@@ -743,7 +784,7 @@ void Application::SigAbrtHandler(int)
 		}
 	}
 
-	bool interactive_debugger = Convert::ToBool(ScriptGlobal::Get("AttachDebugger"));
+	bool interactive_debugger = Configuration::AttachDebugger;
 
 	if (!interactive_debugger) {
 		std::ofstream ofs;
@@ -853,7 +894,7 @@ void Application::ExceptionHandler()
 		}
 	}
 
-	bool interactive_debugger = Convert::ToBool(ScriptGlobal::Get("AttachDebugger"));
+	bool interactive_debugger = Configuration::AttachDebugger;
 
 	if (!interactive_debugger) {
 		std::ofstream ofs;
@@ -964,21 +1005,29 @@ int Application::Run()
 
 	sa.sa_handler = &Application::SigUsr1Handler;
 	sigaction(SIGUSR1, &sa, nullptr);
+
+	sa.sa_handler = &Application::SigUsr2Handler;
+	sigaction(SIGUSR2, &sa, nullptr);
 #else /* _WIN32 */
 	SetConsoleCtrlHandler(&Application::CtrlHandler, TRUE);
 #endif /* _WIN32 */
 
 	try {
-		UpdatePidFile(GetPidPath());
+		UpdatePidFile(Configuration::PidPath);
 	} catch (const std::exception&) {
 		Log(LogCritical, "Application")
-			<< "Cannot update PID file '" << GetPidPath() << "'. Aborting.";
+			<< "Cannot update PID file '" << Configuration::PidPath << "'. Aborting.";
 		return EXIT_FAILURE;
 	}
 
 	SetMainTime(Utility::GetTime());
 
 	return Main();
+}
+
+void Application::UpdatePidFile(const String& filename)
+{
+	UpdatePidFile(filename, Utility::GetPid());
 }
 
 /**
@@ -1049,7 +1098,7 @@ void Application::ClosePidFile(bool unlink)
 
 	if (m_PidFile) {
 		if (unlink) {
-			String pidpath = GetPidPath();
+			String pidpath = Configuration::PidPath;
 			::unlink(pidpath.CStr());
 		}
 
@@ -1117,336 +1166,9 @@ pid_t Application::ReadPidFile(const String& filename)
 	return runningpid;
 }
 
-
-/**
- * Retrieves the path of the installation prefix.
- *
- * @returns The path.
- */
-String Application::GetPrefixDir()
-{
-	return ScriptGlobal::Get("PrefixDir");
-}
-
-/**
- * Sets the path for the installation prefix.
- *
- * @param path The new path.
- */
-void Application::DeclarePrefixDir(const String& path)
-{
-	if (!ScriptGlobal::Exists("PrefixDir"))
-		ScriptGlobal::Set("PrefixDir", path);
-}
-
-/**
- * Retrives the path of the sysconf dir.
- *
- * @returns The path.
- */
-String Application::GetSysconfDir()
-{
-	return ScriptGlobal::Get("SysconfDir");
-}
-
-/**
- * Sets the path of the sysconf dir.
- *
- * @param path The new path.
- */
-void Application::DeclareSysconfDir(const String& path)
-{
-	if (!ScriptGlobal::Exists("SysconfDir"))
-		ScriptGlobal::Set("SysconfDir", path);
-}
-
-/**
- * Retrieves the path for the run dir.
- *
- * @returns The path.
- */
-String Application::GetRunDir()
-{
-	return ScriptGlobal::Get("RunDir");
-}
-
-/**
- * Sets the path of the run dir.
- *
- * @param path The new path.
- */
-void Application::DeclareRunDir(const String& path)
-{
-	if (!ScriptGlobal::Exists("RunDir"))
-		ScriptGlobal::Set("RunDir", path);
-}
-
-/**
- * Retrieves the path for the local state dir.
- *
- * @returns The path.
- */
-String Application::GetLocalStateDir()
-{
-	return ScriptGlobal::Get("LocalStateDir");
-}
-
-/**
- * Sets the path for the local state dir.
- *
- * @param path The new path.
- */
-void Application::DeclareLocalStateDir(const String& path)
-{
-	if (!ScriptGlobal::Exists("LocalStateDir"))
-		ScriptGlobal::Set("LocalStateDir", path);
-}
-
-/**
- * Retrieves the path for the local state dir.
- *
- * @returns The path.
- */
-String Application::GetZonesDir()
-{
-	return ScriptGlobal::Get("ZonesDir", &Empty);
-}
-
-/**
- * Sets the path of the zones dir.
- *
- * @param path The new path.
- */
-void Application::DeclareZonesDir(const String& path)
-{
-	if (!ScriptGlobal::Exists("ZonesDir"))
-		ScriptGlobal::Set("ZonesDir", path);
-}
-
-/**
- * Retrieves the path for the package data dir.
- *
- * @returns The path.
- */
-String Application::GetPkgDataDir()
-{
-	String defaultValue = "";
-	return ScriptGlobal::Get("PkgDataDir", &Empty);
-}
-
-/**
- * Sets the path for the package data dir.
- *
- * @param path The new path.
- */
-void Application::DeclarePkgDataDir(const String& path)
-{
-	if (!ScriptGlobal::Exists("PkgDataDir"))
-		ScriptGlobal::Set("PkgDataDir", path);
-}
-
-/**
- * Retrieves the path for the include conf dir.
- *
- * @returns The path.
- */
-String Application::GetIncludeConfDir()
-{
-	return ScriptGlobal::Get("IncludeConfDir", &Empty);
-}
-
-/**
- * Sets the path for the package data dir.
- *
- * @param path The new path.
- */
-void Application::DeclareIncludeConfDir(const String& path)
-{
-	if (!ScriptGlobal::Exists("IncludeConfDir"))
-		ScriptGlobal::Set("IncludeConfDir", path);
-}
-
-/**
- * Retrieves the path for the state file.
- *
- * @returns The path.
- */
-String Application::GetStatePath()
-{
-	return ScriptGlobal::Get("StatePath", &Empty);
-}
-
-/**
- * Sets the path for the state file.
- *
- * @param path The new path.
- */
-void Application::DeclareStatePath(const String& path)
-{
-	if (!ScriptGlobal::Exists("StatePath"))
-		ScriptGlobal::Set("StatePath", path);
-}
-
-/**
- * Retrieves the path for the modified attributes file.
- *
- * @returns The path.
- */
-String Application::GetModAttrPath()
-{
-	return ScriptGlobal::Get("ModAttrPath", &Empty);
-}
-
-/**
- * Sets the path for the modified attributes file.
- *
- * @param path The new path.
- */
-void Application::DeclareModAttrPath(const String& path)
-{
-	if (!ScriptGlobal::Exists("ModAttrPath"))
-		ScriptGlobal::Set("ModAttrPath", path);
-}
-
-/**
- * Retrieves the path for the objects file.
- *
- * @returns The path.
- */
-String Application::GetObjectsPath()
-{
-	return ScriptGlobal::Get("ObjectsPath", &Empty);
-}
-
-/**
- * Sets the path for the objects file.
- *
- * @param path The new path.
- */
-void Application::DeclareObjectsPath(const String& path)
-{
-	if (!ScriptGlobal::Exists("ObjectsPath"))
-		ScriptGlobal::Set("ObjectsPath", path);
-}
-
-/**
-* Retrieves the path for the vars file.
-*
-* @returns The path.
-*/
-String Application::GetVarsPath()
-{
-	return ScriptGlobal::Get("VarsPath", &Empty);
-}
-
-/**
-* Sets the path for the vars file.
-*
-* @param path The new path.
-*/
-void Application::DeclareVarsPath(const String& path)
-{
-	if (!ScriptGlobal::Exists("VarsPath"))
-		ScriptGlobal::Set("VarsPath", path);
-}
-
-/**
- * Retrieves the path for the PID file.
- *
- * @returns The path.
- */
-String Application::GetPidPath()
-{
-	return ScriptGlobal::Get("PidPath", &Empty);
-}
-
-/**
- * Sets the path for the PID file.
- *
- * @param path The new path.
- */
-void Application::DeclarePidPath(const String& path)
-{
-	if (!ScriptGlobal::Exists("PidPath"))
-		ScriptGlobal::Set("PidPath", path);
-}
-
-/**
- * Retrieves the name of the user.
- *
- * @returns The name.
- */
-String Application::GetRunAsUser()
-{
-	return ScriptGlobal::Get("RunAsUser");
-}
-
-/**
- * Sets the name of the user.
- *
- * @param path The new user name.
- */
-void Application::DeclareRunAsUser(const String& user)
-{
-	if (!ScriptGlobal::Exists("RunAsUser"))
-		ScriptGlobal::Set("RunAsUser", user);
-}
-
-/**
- * Retrieves the name of the group.
- *
- * @returns The name.
- */
-String Application::GetRunAsGroup()
-{
-	return ScriptGlobal::Get("RunAsGroup");
-}
-
-/**
- * Sets the name of the group.
- *
- * @param path The new group name.
- */
-void Application::DeclareRunAsGroup(const String& group)
-{
-	if (!ScriptGlobal::Exists("RunAsGroup"))
-		ScriptGlobal::Set("RunAsGroup", group);
-}
-
-/**
- * Retrieves the file rlimit.
- *
- * @returns The limit.
- */
-int Application::GetRLimitFiles()
-{
-	return ScriptGlobal::Get("RLimitFiles");
-}
-
 int Application::GetDefaultRLimitFiles()
 {
 	return 16 * 1024;
-}
-
-/**
- * Sets the file rlimit.
- *
- * @param path The new file rlimit.
- */
-void Application::DeclareRLimitFiles(int limit)
-{
-	if (!ScriptGlobal::Exists("RLimitFiles"))
-		ScriptGlobal::Set("RLimitFiles", limit);
-}
-
-/**
- * Retrieves the process rlimit.
- *
- * @returns The limit.
- */
-int Application::GetRLimitProcesses()
-{
-	return ScriptGlobal::Get("RLimitProcesses");
 }
 
 int Application::GetDefaultRLimitProcesses()
@@ -1454,63 +1176,14 @@ int Application::GetDefaultRLimitProcesses()
 	return 16 * 1024;
 }
 
-/**
- * Sets the process rlimit.
- *
- * @param path The new process rlimit.
- */
-void Application::DeclareRLimitProcesses(int limit)
-{
-	if (!ScriptGlobal::Exists("RLimitProcesses"))
-		ScriptGlobal::Set("RLimitProcesses", limit);
-}
-
-/**
- * Retrieves the stack rlimit.
- *
- * @returns The limit.
- */
-int Application::GetRLimitStack()
-{
-	return ScriptGlobal::Get("RLimitStack");
-}
-
 int Application::GetDefaultRLimitStack()
 {
 	return 256 * 1024;
 }
 
-/**
- * Sets the stack rlimit.
- *
- * @param path The new stack rlimit.
- */
-void Application::DeclareRLimitStack(int limit)
+double Application::GetReloadTimeout()
 {
-	if (!ScriptGlobal::Exists("RLimitStack"))
-		ScriptGlobal::Set("RLimitStack", limit);
-}
-
-/**
- * Sets the concurrency level.
- *
- * @param path The new concurrency level.
- */
-void Application::DeclareConcurrency(int ncpus)
-{
-	if (!ScriptGlobal::Exists("Concurrency"))
-		ScriptGlobal::Set("Concurrency", ncpus);
-}
-
-/**
- * Retrieves the concurrency level.
- *
- * @returns The concurrency level.
- */
-int Application::GetConcurrency()
-{
-	Value defaultConcurrency = std::thread::hardware_concurrency();
-	return ScriptGlobal::Get("Concurrency", &defaultConcurrency);
+	return ScriptGlobal::Get("ReloadTimeout");
 }
 
 /**

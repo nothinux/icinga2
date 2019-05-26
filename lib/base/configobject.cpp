@@ -1,24 +1,7 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #include "base/configobject.hpp"
-#include "base/configobject.tcpp"
+#include "base/configobject-ti.cpp"
 #include "base/configtype.hpp"
 #include "base/serializer.hpp"
 #include "base/netstring.hpp"
@@ -34,8 +17,6 @@
 #include "base/context.hpp"
 #include "base/application.hpp"
 #include <fstream>
-#include <boost/algorithm/string/split.hpp>
-#include <boost/algorithm/string/classification.hpp>
 #include <boost/exception/errinfo_api_function.hpp>
 #include <boost/exception/errinfo_errno.hpp>
 #include <boost/exception/errinfo_file_name.hpp>
@@ -113,8 +94,7 @@ void ConfigObject::ModifyAttribute(const String& attr, const Value& value, bool 
 
 	Type::Ptr type = GetReflectionType();
 
-	std::vector<String> tokens;
-	boost::algorithm::split(tokens, attr, boost::is_any_of("."));
+	std::vector<String> tokens = attr.Split(".");
 
 	String fieldName = tokens[0];
 
@@ -225,8 +205,7 @@ void ConfigObject::RestoreAttribute(const String& attr, bool updateVersion)
 {
 	Type::Ptr type = GetReflectionType();
 
-	std::vector<String> tokens;
-	boost::algorithm::split(tokens, attr, boost::is_any_of("."));
+	std::vector<String> tokens = attr.Split(".");
 
 	String fieldName = tokens[0];
 
@@ -279,8 +258,7 @@ void ConfigObject::RestoreAttribute(const String& attr, bool updateVersion)
 		{
 			ObjectLock olock(original_attributes);
 			for (const auto& kv : original_attributes) {
-				std::vector<String> originalTokens;
-				boost::algorithm::split(originalTokens, kv.first, boost::is_any_of("."));
+				std::vector<String> originalTokens = String(kv.first).Split(".");
 
 				if (tokens.size() > originalTokens.size())
 					continue;
@@ -527,16 +505,7 @@ void ConfigObject::DumpObjects(const String& filename, int attributeTypes)
 
 	fp.close();
 
-#ifdef _WIN32
-	_unlink(filename.CStr());
-#endif /* _WIN32 */
-
-	if (rename(tempFilename.CStr(), filename.CStr()) < 0) {
-		BOOST_THROW_EXCEPTION(posix_error()
-			<< boost::errinfo_api_function("rename")
-			<< boost::errinfo_errno(errno)
-			<< boost::errinfo_file_name(tempFilename));
-	}
+	Utility::RenameFile(tempFilename, filename);
 }
 
 void ConfigObject::RestoreObject(const String& message, int attributeTypes)
@@ -576,7 +545,7 @@ void ConfigObject::RestoreObjects(const String& filename, int attributeTypes)
 
 	unsigned long restored = 0;
 
-	WorkQueue upq(25000, Application::GetConcurrency());
+	WorkQueue upq(25000, Configuration::Concurrency);
 	upq.SetName("ConfigObject::RestoreObjects");
 
 	String message;
@@ -622,13 +591,25 @@ void ConfigObject::RestoreObjects(const String& filename, int attributeTypes)
 
 void ConfigObject::StopObjects()
 {
-	for (const Type::Ptr& type : Type::GetAllTypes()) {
+	std::vector<Type::Ptr> types = Type::GetAllTypes();
+
+	std::sort(types.begin(), types.end(), [](const Type::Ptr& a, const Type::Ptr& b) {
+		if (a->GetActivationPriority() > b->GetActivationPriority())
+			return true;
+		return false;
+	});
+
+	for (const Type::Ptr& type : types) {
 		auto *dtype = dynamic_cast<ConfigType *>(type.get());
 
 		if (!dtype)
 			continue;
 
 		for (const ConfigObject::Ptr& object : dtype->GetObjects()) {
+#ifdef I2_DEBUG
+			Log(LogDebug, "ConfigObject")
+				<< "Deactivate() called for config object '" << object->GetName() << "' with type '" << type->GetName() << "'.";
+#endif /* I2_DEBUG */
 			object->Deactivate();
 		}
 	}
@@ -654,8 +635,7 @@ void ConfigObject::DumpModifiedAttributes(const std::function<void(const ConfigO
 
 				Type::Ptr type = object->GetReflectionType();
 
-				std::vector<String> tokens;
-				boost::algorithm::split(tokens, key, boost::is_any_of("."));
+				std::vector<String> tokens = key.Split(".");
 
 				String fieldName = tokens[0];
 				int fid = type->GetFieldId(fieldName);

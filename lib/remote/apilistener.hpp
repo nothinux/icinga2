@@ -1,26 +1,9 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #ifndef APILISTENER_H
 #define APILISTENER_H
 
-#include "remote/apilistener.thpp"
+#include "remote/apilistener-ti.hpp"
 #include "remote/jsonrpcconnection.hpp"
 #include "remote/httpserverconnection.hpp"
 #include "remote/endpoint.hpp"
@@ -30,6 +13,10 @@
 #include "base/workqueue.hpp"
 #include "base/tcpsocket.hpp"
 #include "base/tlsstream.hpp"
+#include "base/threadpool.hpp"
+#include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/spawn.hpp>
+#include <boost/asio/ssl/context.hpp>
 #include <set>
 
 namespace icinga
@@ -79,7 +66,7 @@ public:
 	static void StatsFunc(const Dictionary::Ptr& status, const Array::Ptr& perfdata);
 	std::pair<Dictionary::Ptr, Dictionary::Ptr> GetStatus();
 
-	void AddAnonymousClient(const JsonRpcConnection::Ptr& aclient);
+	bool AddAnonymousClient(const JsonRpcConnection::Ptr& aclient);
 	void RemoveAnonymousClient(const JsonRpcConnection::Ptr& aclient);
 	std::set<JsonRpcConnection::Ptr> GetAnonymousClients() const;
 
@@ -97,6 +84,11 @@ public:
 	static Value ConfigUpdateObjectAPIHandler(const MessageOrigin::Ptr& origin, const Dictionary::Ptr& params);
 	static Value ConfigDeleteObjectAPIHandler(const MessageOrigin::Ptr& origin, const Dictionary::Ptr& params);
 
+	/* API config packages */
+	void SetActivePackageStage(const String& package, const String& stage);
+	String GetActivePackageStage(const String& package);
+	void RemoveActivePackageStage(const String& package);
+
 	static Value HelloAPIHandler(const MessageOrigin::Ptr& origin, const Dictionary::Ptr& params);
 
 	static void UpdateObjectAuthority();
@@ -108,6 +100,9 @@ public:
 	static String GetDefaultKeyPath();
 	static String GetDefaultCaPath();
 
+	double GetTlsHandshakeTimeout() const override;
+	void SetTlsHandshakeTimeout(double value, bool suppress_events, const Value& cookie) override;
+
 protected:
 	void OnConfigLoaded() override;
 	void OnAllConfigLoaded() override;
@@ -115,10 +110,10 @@ protected:
 	void Stop(bool runtimeDeleted) override;
 
 	void ValidateTlsProtocolmin(const Lazy<String>& lvalue, const ValidationUtils& utils) override;
+	void ValidateTlsHandshakeTimeout(const Lazy<double>& lvalue, const ValidationUtils& utils) override;
 
 private:
-	std::shared_ptr<SSL_CTX> m_SSLContext;
-	std::set<TcpSocket::Ptr> m_Servers;
+	std::shared_ptr<boost::asio::ssl::context> m_SSLContext;
 
 	mutable boost::mutex m_AnonymousClientsLock;
 	mutable boost::mutex m_HttpClientsLock;
@@ -129,6 +124,8 @@ private:
 	Timer::Ptr m_ReconnectTimer;
 	Timer::Ptr m_AuthorityTimer;
 	Timer::Ptr m_CleanupCertificateRequestsTimer;
+	Timer::Ptr m_ApiPackageIntegrityTimer;
+
 	Endpoint::Ptr m_LocalEndpoint;
 
 	static ApiListener::Ptr m_Instance;
@@ -136,13 +133,14 @@ private:
 	void ApiTimerHandler();
 	void ApiReconnectTimerHandler();
 	void CleanupCertificateRequestsTimerHandler();
+	void CheckApiPackageIntegrity();
 
 	bool AddListener(const String& node, const String& service);
 	void AddConnection(const Endpoint::Ptr& endpoint);
 
-	void NewClientHandler(const Socket::Ptr& client, const String& hostname, ConnectionRole role);
-	void NewClientHandlerInternal(const Socket::Ptr& client, const String& hostname, ConnectionRole role);
-	void ListenerThreadProc(const Socket::Ptr& server);
+	void NewClientHandler(boost::asio::yield_context yc, const std::shared_ptr<AsioTlsStream>& client, const String& hostname, ConnectionRole role);
+	void NewClientHandlerInternal(boost::asio::yield_context yc, const std::shared_ptr<AsioTlsStream>& client, const String& hostname, ConnectionRole role);
+	void ListenerCoroutineProc(boost::asio::yield_context yc, const std::shared_ptr<boost::asio::ip::tcp::acceptor>& server, const std::shared_ptr<boost::asio::ssl::context>& sslContext);
 
 	WorkQueue m_RelayQueue;
 	WorkQueue m_SyncQueue{0, 4};
@@ -151,7 +149,7 @@ private:
 	Stream::Ptr m_LogFile;
 	size_t m_LogMessageCount{0};
 
-	bool RelayMessageOne(const Zone::Ptr& zone, const MessageOrigin::Ptr& origin, const Dictionary::Ptr& message, const Endpoint::Ptr& currentMaster);
+	bool RelayMessageOne(const Zone::Ptr& zone, const MessageOrigin::Ptr& origin, const Dictionary::Ptr& message, const Endpoint::Ptr& currentZoneMaster);
 	void SyncRelayMessage(const MessageOrigin::Ptr& origin, const ConfigObject::Ptr& secobj, const Dictionary::Ptr& message, bool log);
 	void PersistMessage(const Dictionary::Ptr& message, const ConfigObject::Ptr& secobj);
 
@@ -162,6 +160,9 @@ private:
 	void ReplayLog(const JsonRpcConnection::Ptr& client);
 
 	static void CopyCertificateFile(const String& oldCertPath, const String& newCertPath);
+
+	void UpdateStatusFile(boost::asio::ip::tcp::endpoint localEndpoint);
+	void RemoveStatusFile();
 
 	/* filesync */
 	static ConfigDirInformation LoadConfigDir(const String& dir);
@@ -182,6 +183,12 @@ private:
 	void SendRuntimeConfigObjects(const JsonRpcConnection::Ptr& aclient);
 
 	void SyncClient(const JsonRpcConnection::Ptr& aclient, const Endpoint::Ptr& endpoint, bool needSync);
+
+	/* API Config Packages */
+	mutable boost::mutex m_ActivePackageStagesLock;
+	std::map<String, String> m_ActivePackageStages;
+
+	void UpdateActivePackageStagesCache();
 };
 
 }

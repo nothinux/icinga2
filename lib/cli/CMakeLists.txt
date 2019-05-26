@@ -1,19 +1,4 @@
-# Icinga 2
-# Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)
-#
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation
-# Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
+# Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+
 
 set(cli_SOURCES
   i2-cli.hpp
@@ -30,6 +15,7 @@ set(cli_SOURCES
   featureenablecommand.cpp featureenablecommand.hpp
   featurelistcommand.cpp featurelistcommand.hpp
   featureutility.cpp featureutility.hpp
+  internalsignalcommand.cpp internalsignalcommand.hpp
   nodesetupcommand.cpp nodesetupcommand.hpp
   nodeutility.cpp nodeutility.hpp
   nodewizardcommand.cpp nodewizardcommand.hpp
@@ -48,22 +34,12 @@ set(cli_SOURCES
 )
 
 if(ICINGA2_UNITY_BUILD)
-    mkunity_target(cli cli cli_SOURCES)
+  mkunity_target(cli cli cli_SOURCES)
 endif()
 
-add_library(cli STATIC ${cli_SOURCES})
+add_library(cli OBJECT ${cli_SOURCES})
 
-target_link_libraries(cli ${Boost_LIBRARIES} base config remote)
-
-if(EDITLINE_FOUND)
-  target_link_libraries(cli ${EDITLINE_LIBRARIES})
-  include_directories(${EDITLINE_INCLUDE_DIR})
-endif()
-
-if(TERMCAP_FOUND)
-  target_link_libraries(cli ${TERMCAP_LIBRARIES})
-  include_directories(${TERMCAP_INCLUDE_DIR})
-endif()
+add_dependencies(cli base config remote)
 
 set_target_properties (
   cli PROPERTIES

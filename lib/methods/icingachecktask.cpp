@@ -1,21 +1,4 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #include "methods/icingachecktask.hpp"
 #include "icinga/cib.hpp"
@@ -23,6 +6,8 @@
 #include "icinga/checkcommand.hpp"
 #include "icinga/macroprocessor.hpp"
 #include "icinga/icingaapplication.hpp"
+#include "icinga/clusterevents.hpp"
+#include "icinga/checkable.hpp"
 #include "base/application.hpp"
 #include "base/objectlock.hpp"
 #include "base/utility.hpp"
@@ -32,11 +17,14 @@
 
 using namespace icinga;
 
-REGISTER_SCRIPTFUNCTION_NS(Internal, IcingaCheck, &IcingaCheckTask::ScriptFunc, "checkable:cr:resolvedMacros:useResolvedMacros");
+REGISTER_FUNCTION_NONCONST(Internal, IcingaCheck, &IcingaCheckTask::ScriptFunc, "checkable:cr:resolvedMacros:useResolvedMacros");
 
 void IcingaCheckTask::ScriptFunc(const Checkable::Ptr& checkable, const CheckResult::Ptr& cr,
 	const Dictionary::Ptr& resolvedMacros, bool useResolvedMacros)
 {
+	REQUIRE_NOT_NULL(checkable);
+	REQUIRE_NOT_NULL(cr);
+
 	CheckCommand::Ptr commandObj = checkable->GetCheckCommand();
 
 	Host::Ptr host;
@@ -50,8 +38,10 @@ void IcingaCheckTask::ScriptFunc(const Checkable::Ptr& checkable, const CheckRes
 	resolvers.emplace_back("command", commandObj);
 	resolvers.emplace_back("icinga", IcingaApplication::GetInstance());
 
+	String missingIcingaMinVersion;
+
 	String icingaMinVersion = MacroProcessor::ResolveMacros("$icinga_min_version$", resolvers, checkable->GetLastCheckResult(),
-		nullptr, MacroProcessor::EscapeCallback(), resolvedMacros, useResolvedMacros);
+		&missingIcingaMinVersion, MacroProcessor::EscapeCallback(), resolvedMacros, useResolvedMacros);
 
 	if (resolvedMacros && !useResolvedMacros)
 		return;
@@ -83,6 +73,9 @@ void IcingaCheckTask::ScriptFunc(const Checkable::Ptr& checkable, const CheckRes
 	perfdata->Add(new PerfdataValue("passive_service_checks_5min", CIB::GetPassiveServiceChecksStatistics(60 * 5)));
 	perfdata->Add(new PerfdataValue("active_service_checks_15min", CIB::GetActiveServiceChecksStatistics(60 * 15)));
 	perfdata->Add(new PerfdataValue("passive_service_checks_15min", CIB::GetPassiveServiceChecksStatistics(60 * 15)));
+
+	perfdata->Add(new PerfdataValue("current_concurrent_checks", Checkable::GetPendingChecks()));
+	perfdata->Add(new PerfdataValue("remote_check_queue", ClusterEvents::GetCheckRequestQueueSize()));
 
 	CheckableCheckStatistics scs = CIB::CalculateServiceCheckStats();
 
@@ -164,10 +157,14 @@ void IcingaCheckTask::ScriptFunc(const Checkable::Ptr& checkable, const CheckRes
 		cr->SetState(ServiceWarning);
 	}
 
-	/* Return an error if the version is less than specified (optional). */
-	String parsedAppVersion = appVersion.SubStr(1,5);
+	/* Extract the version number of the running Icinga2 instance.
+	 * We assume that appVersion will allways be something like 'v2.10.1-8-gaebe6da' and we want to extract '2.10.1'.
+	 */
+	int endOfVersionNumber = appVersion.FindFirstOf("-") - 1;
+	String parsedAppVersion = appVersion.SubStr(1, endOfVersionNumber);
 
-	if (!icingaMinVersion.IsEmpty() && Utility::CompareVersion(icingaMinVersion, parsedAppVersion) < 0) {
+	/* Return an error if the version is less than specified (optional). */
+	if (missingIcingaMinVersion.IsEmpty() && !icingaMinVersion.IsEmpty() && Utility::CompareVersion(icingaMinVersion, parsedAppVersion) < 0) {
 		output += "; Minimum version " + icingaMinVersion + " is not installed.";
 		cr->SetState(ServiceCritical);
 	}

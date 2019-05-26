@@ -1,21 +1,4 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #include "remote/objectqueryhandler.hpp"
 #include "remote/httputility.hpp"
@@ -23,7 +6,7 @@
 #include "base/serializer.hpp"
 #include "base/dependencygraph.hpp"
 #include "base/configtype.hpp"
-#include <boost/algorithm/string.hpp>
+#include <boost/algorithm/string/case_conv.hpp>
 #include <set>
 
 using namespace icinga;
@@ -104,15 +87,26 @@ Dictionary::Ptr ObjectQueryHandler::SerializeObjectAttrs(const Object::Ptr& obje
 	return new Dictionary(std::move(resultAttrs));
 }
 
-bool ObjectQueryHandler::HandleRequest(const ApiUser::Ptr& user, HttpRequest& request, HttpResponse& response, const Dictionary::Ptr& params)
+bool ObjectQueryHandler::HandleRequest(
+	AsioTlsStream& stream,
+	const ApiUser::Ptr& user,
+	boost::beast::http::request<boost::beast::http::string_body>& request,
+	const Url::Ptr& url,
+	boost::beast::http::response<boost::beast::http::string_body>& response,
+	const Dictionary::Ptr& params,
+	boost::asio::yield_context& yc,
+	HttpServerConnection& server
+)
 {
-	if (request.RequestUrl->GetPath().size() < 3 || request.RequestUrl->GetPath().size() > 4)
+	namespace http = boost::beast::http;
+
+	if (url->GetPath().size() < 3 || url->GetPath().size() > 4)
 		return false;
 
-	if (request.RequestMethod != "GET")
+	if (request.method() != http::verb::get)
 		return false;
 
-	Type::Ptr type = FilterUtility::TypeFromPluralName(request.RequestUrl->GetPath()[2]);
+	Type::Ptr type = FilterUtility::TypeFromPluralName(url->GetPath()[2]);
 
 	if (!type) {
 		HttpUtility::SendJsonError(response, params, 400, "Invalid type specified.");
@@ -129,7 +123,7 @@ bool ObjectQueryHandler::HandleRequest(const ApiUser::Ptr& user, HttpRequest& re
 		uattrs = params->Get("attrs");
 	} catch (const std::exception&) {
 		HttpUtility::SendJsonError(response, params, 400,
-			"Invalid type for 'attrs' attribute specified. Array type is required.", Empty);
+			"Invalid type for 'attrs' attribute specified. Array type is required.");
 		return true;
 	}
 
@@ -137,7 +131,7 @@ bool ObjectQueryHandler::HandleRequest(const ApiUser::Ptr& user, HttpRequest& re
 		ujoins = params->Get("joins");
 	} catch (const std::exception&) {
 		HttpUtility::SendJsonError(response, params, 400,
-			"Invalid type for 'joins' attribute specified. Array type is required.", Empty);
+			"Invalid type for 'joins' attribute specified. Array type is required.");
 		return true;
 	}
 
@@ -145,7 +139,7 @@ bool ObjectQueryHandler::HandleRequest(const ApiUser::Ptr& user, HttpRequest& re
 		umetas = params->Get("meta");
 	} catch (const std::exception&) {
 		HttpUtility::SendJsonError(response, params, 400,
-			"Invalid type for 'meta' attribute specified. Array type is required.", Empty);
+			"Invalid type for 'meta' attribute specified. Array type is required.");
 		return true;
 	}
 
@@ -153,10 +147,10 @@ bool ObjectQueryHandler::HandleRequest(const ApiUser::Ptr& user, HttpRequest& re
 
 	params->Set("type", type->GetName());
 
-	if (request.RequestUrl->GetPath().size() >= 4) {
+	if (url->GetPath().size() >= 4) {
 		String attr = type->GetName();
 		boost::algorithm::to_lower(attr);
-		params->Set(attr, request.RequestUrl->GetPath()[3]);
+		params->Set(attr, url->GetPath()[3]);
 	}
 
 	std::vector<Value> objs;
@@ -166,7 +160,7 @@ bool ObjectQueryHandler::HandleRequest(const ApiUser::Ptr& user, HttpRequest& re
 	} catch (const std::exception& ex) {
 		HttpUtility::SendJsonError(response, params, 404,
 			"No objects found.",
-			HttpUtility::GetLastParameter(params, "verboseErrors") ? DiagnosticInformation(ex) : "");
+			DiagnosticInformation(ex));
 		return true;
 	}
 
@@ -282,7 +276,7 @@ bool ObjectQueryHandler::HandleRequest(const ApiUser::Ptr& user, HttpRequest& re
 		{ "results", new Array(std::move(results)) }
 	});
 
-	response.SetStatus(200, "OK");
+	response.result(http::status::ok);
 	HttpUtility::SendJsonBody(response, params, result);
 
 	return true;

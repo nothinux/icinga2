@@ -1,21 +1,4 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #include "icinga/macroprocessor.hpp"
 #include "icinga/macroresolver.hpp"
@@ -28,9 +11,7 @@
 #include "base/scriptframe.hpp"
 #include "base/convert.hpp"
 #include "base/exception.hpp"
-#include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/join.hpp>
-#include <boost/algorithm/string/classification.hpp>
 
 using namespace icinga;
 
@@ -39,6 +20,9 @@ Value MacroProcessor::ResolveMacros(const Value& str, const ResolverList& resolv
 	const MacroProcessor::EscapeCallback& escapeFn, const Dictionary::Ptr& resolvedMacros,
 	bool useResolvedMacros, int recursionLevel)
 {
+	if (useResolvedMacros)
+		REQUIRE_NOT_NULL(resolvedMacros);
+
 	Value result;
 
 	if (str.IsEmpty())
@@ -48,7 +32,7 @@ Value MacroProcessor::ResolveMacros(const Value& str, const ResolverList& resolv
 		result = InternalResolveMacros(str, resolvers, cr, missingMacro, escapeFn,
 			resolvedMacros, useResolvedMacros, recursionLevel + 1);
 	} else if (str.IsObjectType<Array>()) {
-		ArrayData resultArr;;
+		ArrayData resultArr;
 		Array::Ptr arr = str;
 
 		ObjectLock olock(arr);
@@ -94,8 +78,7 @@ bool MacroProcessor::ResolveMacro(const String& macro, const ResolverList& resol
 
 	*recursive_macro = false;
 
-	std::vector<String> tokens;
-	boost::algorithm::split(tokens, macro, boost::is_any_of("."));
+	std::vector<String> tokens = macro.Split(".");
 
 	String objName;
 	if (tokens.size() > 1) {
@@ -439,6 +422,9 @@ Value MacroProcessor::ResolveArguments(const Value& command, const Dictionary::P
 	const MacroProcessor::ResolverList& resolvers, const CheckResult::Ptr& cr,
 	const Dictionary::Ptr& resolvedMacros, bool useResolvedMacros, int recursionLevel)
 {
+	if (useResolvedMacros)
+		REQUIRE_NOT_NULL(resolvedMacros);
+
 	Value resolvedCommand;
 	if (!arguments || command.IsObjectType<Array>() || command.IsObjectType<Function>())
 		resolvedCommand = MacroProcessor::ResolveMacros(command, resolvers, cr, nullptr,

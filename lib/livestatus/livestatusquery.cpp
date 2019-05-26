@@ -1,21 +1,4 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #include "livestatus/livestatusquery.hpp"
 #include "livestatus/countaggregator.hpp"
@@ -41,9 +24,7 @@
 #include "base/serializer.hpp"
 #include "base/timer.hpp"
 #include "base/initialize.hpp"
-#include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/replace.hpp>
-#include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/join.hpp>
 
 using namespace icinga;
@@ -122,11 +103,10 @@ LivestatusQuery::LivestatusQuery(const std::vector<String>& lines, const String&
 			m_KeepAlive = (params == "on");
 		else if (header == "Columns") {
 			m_ColumnHeaders = false; // Might be explicitly re-enabled later on
-			boost::algorithm::split(m_Columns, params, boost::is_any_of(" "));
+			m_Columns = params.Split(" ");
 		} else if (header == "Separators") {
-			std::vector<String> separators;
+			std::vector<String> separators = params.Split(" ");
 
-			boost::algorithm::split(separators, params, boost::is_any_of(" "));
 			/* ugly ascii long to char conversion, but works */
 			if (separators.size() > 0)
 				m_Separators[0] = String(1, static_cast<char>(Convert::ToLong(separators[0])));
@@ -154,8 +134,7 @@ LivestatusQuery::LivestatusQuery(const std::vector<String>& lines, const String&
 		} else if (header == "Stats") {
 			m_ColumnHeaders = false; // Might be explicitly re-enabled later on
 
-			std::vector<String> tokens;
-			boost::algorithm::split(tokens, params, boost::is_any_of(" "));
+			std::vector<String> tokens = params.Split(" ");
 
 			if (tokens.size() < 2) {
 				m_Verb = "ERROR";

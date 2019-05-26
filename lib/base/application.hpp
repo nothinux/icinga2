@@ -1,34 +1,18 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #ifndef APPLICATION_H
 #define APPLICATION_H
 
 #include "base/i2-base.hpp"
-#include "base/application.thpp"
-#include "base/threadpool.hpp"
-#include "base/utility.hpp"
+#include "base/application-ti.hpp"
 #include "base/logger.hpp"
-#include <ostream>
+#include "base/configuration.hpp"
+#include <iosfwd>
 
 namespace icinga
 {
+
+class ThreadPool;
 
 /**
  * Abstract base class for applications.
@@ -74,81 +58,35 @@ public:
 	static void RequestReopenLogs();
 
 	static bool IsShuttingDown();
+	static bool IsRestarting();
 
 	static void SetDebuggingSeverity(LogSeverity severity);
 	static LogSeverity GetDebuggingSeverity();
 
-	void UpdatePidFile(const String& filename, pid_t pid = Utility::GetPid());
+	void UpdatePidFile(const String& filename);
+	void UpdatePidFile(const String& filename, pid_t pid);
 	void ClosePidFile(bool unlink);
 	static pid_t ReadPidFile(const String& filename);
 
 	static String GetExePath(const String& argv0);
 
-	static String GetPrefixDir();
-	static void DeclarePrefixDir(const String& path);
-
-	static String GetSysconfDir();
-	static void DeclareSysconfDir(const String& path);
-
-	static String GetZonesDir();
-	static void DeclareZonesDir(const String& path);
-
-	static String GetRunDir();
-	static void DeclareRunDir(const String& path);
-
-	static String GetLocalStateDir();
-	static void DeclareLocalStateDir(const String& path);
-
-	static String GetPkgDataDir();
-	static void DeclarePkgDataDir(const String& path);
-
-	static String GetIncludeConfDir();
-	static void DeclareIncludeConfDir(const String& path);
-
-	static String GetStatePath();
-	static void DeclareStatePath(const String& path);
-
-	static String GetModAttrPath();
-	static void DeclareModAttrPath(const String& path);
-
-	static String GetObjectsPath();
-	static void DeclareObjectsPath(const String& path);
-
-	static String GetVarsPath();
-	static void DeclareVarsPath(const String& path);
-
-	static String GetPidPath();
-	static void DeclarePidPath(const String& path);
-
-	static String GetRunAsUser();
-	static void DeclareRunAsUser(const String& user);
-
-	static String GetRunAsGroup();
-	static void DeclareRunAsGroup(const String& group);
-
 #ifdef _WIN32
 	static bool IsProcessElevated();
 #endif /* _WIN32 */
 
-	static int GetRLimitFiles();
 	static int GetDefaultRLimitFiles();
-	static void DeclareRLimitFiles(int limit);
-
-	static int GetRLimitProcesses();
 	static int GetDefaultRLimitProcesses();
-	static void DeclareRLimitProcesses(int limit);
-
-	static int GetRLimitStack();
 	static int GetDefaultRLimitStack();
-	static void DeclareRLimitStack(int limit);
 
-	static int GetConcurrency();
-	static void DeclareConcurrency(int ncpus);
+	static double GetReloadTimeout();
 
 	static ThreadPool& GetTP();
 
 	static String GetAppVersion();
 	static String GetAppSpecVersion();
+
+	static String GetAppEnvironment();
+	static void SetAppEnvironment(const String& name);
 
 	static double GetStartTime();
 	static void SetStartTime(double ts);
@@ -205,6 +143,7 @@ private:
 
 	static void SigAbrtHandler(int signum);
 	static void SigUsr1Handler(int signum);
+	static void SigUsr2Handler(int signum);
 	static void ExceptionHandler();
 
 	static String GetCrashReportFilename();

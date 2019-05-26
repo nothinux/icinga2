@@ -1,21 +1,4 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #include "icinga/apiactions.hpp"
 #include "icinga/service.hpp"
@@ -112,7 +95,15 @@ Dictionary::Ptr ApiActions::ProcessCheckResult(const ConfigObject::Ptr& object,
 		cr->SetExecutionEnd(HttpUtility::GetLastParameter(params, "execution_end"));
 
 	cr->SetCheckSource(HttpUtility::GetLastParameter(params, "check_source"));
-	cr->SetPerformanceData(params->Get("performance_data"));
+
+	Value perfData = params->Get("performance_data");
+
+	/* Allow to pass a performance data string from Icinga Web 2 next to the new Array notation. */
+	if (perfData.IsString())
+		cr->SetPerformanceData(PluginUtility::SplitPerfdata(perfData));
+	else
+		cr->SetPerformanceData(perfData);
+
 	cr->SetCommand(params->Get("check_command"));
 
 	/* Mark this check result as passive. */
@@ -250,7 +241,7 @@ Dictionary::Ptr ApiActions::RemoveAcknowledgement(const ConfigObject::Ptr& objec
 
 	if (!checkable)
 		return ApiActions::CreateResult(404,
-			"Cannot remove acknowlegement for non-existent checkable object "
+			"Cannot remove acknowledgement for non-existent checkable object "
 			+ object->GetName() + ".");
 
 	checkable->ClearAcknowledgement();
@@ -347,6 +338,15 @@ Dictionary::Ptr ApiActions::ScheduleDowntime(const ConfigObject::Ptr& object,
 	double startTime = HttpUtility::GetLastParameter(params, "start_time");
 	double endTime = HttpUtility::GetLastParameter(params, "end_time");
 
+	DowntimeChildOptions childOptions = DowntimeNoChildren;
+	if (params->Contains("child_options")) {
+		try {
+			childOptions = Downtime::ChildOptionsFromValue(HttpUtility::GetLastParameter(params, "child_options"));
+		} catch (const std::exception&) {
+			return ApiActions::CreateResult(400, "Option 'child_options' provided an invalid value.");
+		}
+	}
+
 	String downtimeName = Downtime::AddDowntime(checkable, author, comment, startTime, endTime,
 		fixed, triggerName, duration);
 
@@ -358,30 +358,26 @@ Dictionary::Ptr ApiActions::ScheduleDowntime(const ConfigObject::Ptr& object,
 	});
 
 	/* Schedule downtime for all child objects. */
-	int childOptions = 0;
-	if (params->Contains("child_options"))
-		childOptions = HttpUtility::GetLastParameter(params, "child_options");
-
-	if (childOptions > 0) {
-		/* '1' schedules child downtimes triggered by the parent downtime.
-		 * '2' schedules non-triggered downtimes for all children.
+	if (childOptions != DowntimeNoChildren) {
+		/* 'DowntimeTriggeredChildren' schedules child downtimes triggered by the parent downtime.
+		 * 'DowntimeNonTriggeredChildren' schedules non-triggered downtimes for all children.
 		 */
-		if (childOptions == 1)
+		if (childOptions == DowntimeTriggeredChildren)
 			triggerName = downtimeName;
 
-		Log(LogCritical, "ApiActions")
+		Log(LogNotice, "ApiActions")
 			<< "Processing child options " << childOptions << " for downtime " << downtimeName;
 
 		ArrayData childDowntimes;
 
 		for (const Checkable::Ptr& child : checkable->GetAllChildren()) {
-			Log(LogCritical, "ApiActions")
+			Log(LogNotice, "ApiActions")
 				<< "Scheduling downtime for child object " << child->GetName();
 
 			String childDowntimeName = Downtime::AddDowntime(child, author, comment, startTime, endTime,
 				fixed, triggerName, duration);
 
-			Log(LogCritical, "ApiActions")
+			Log(LogNotice, "ApiActions")
 				<< "Add child downtime '" << childDowntimeName << "'.";
 
 			Downtime::Ptr childDowntime = Downtime::GetByName(childDowntimeName);

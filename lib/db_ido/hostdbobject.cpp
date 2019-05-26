@@ -1,21 +1,4 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #include "db_ido/hostdbobject.hpp"
 #include "db_ido/hostgroupdbobject.hpp"
@@ -81,11 +64,11 @@ Dictionary::Ptr HostDbObject::GetConfigFields() const
 		{ "icon_image", host->GetIconImage() },
 		{ "icon_image_alt", host->GetIconImageAlt() },
 		{ "notification_interval", CompatUtility::GetCheckableNotificationNotificationInterval(host) },
-		{ "notify_on_down", (notificationStateFilter & ServiceWarning) || (notificationStateFilter && ServiceCritical) },
+		{ "notify_on_down", (notificationStateFilter & (ServiceWarning | ServiceCritical)) ? 1 : 0 },
 		{ "notify_on_unreachable", 1 }, /* We don't have this filter and state, and as such we don't filter such notifications. */
-		{ "notify_on_recovery", notificationTypeFilter & NotificationRecovery },
-		{ "notify_on_flapping", (notificationTypeFilter & NotificationFlappingStart) || (notificationTypeFilter & NotificationFlappingEnd) },
-		{ "notify_on_downtime", (notificationTypeFilter & NotificationDowntimeStart) || (notificationTypeFilter & NotificationDowntimeEnd) || (notificationTypeFilter & NotificationDowntimeRemoved) }
+		{ "notify_on_recovery", (notificationTypeFilter & NotificationRecovery) ? 1 : 0 },
+		{ "notify_on_flapping", (notificationTypeFilter & (NotificationFlappingStart | NotificationFlappingEnd)) ? 1 : 0 },
+		{ "notify_on_downtime", (notificationTypeFilter & (NotificationDowntimeStart | NotificationDowntimeEnd | NotificationDowntimeRemoved)) ? 1 : 0 }
 	});
 }
 
@@ -107,7 +90,7 @@ Dictionary::Ptr HostDbObject::GetStatusFields() const
 
 	int currentState = host->GetState();
 
-	if (currentState != HostUp && !host->IsReachable())
+	if (currentState != HostUp && !host->GetLastReachable())
 		currentState = 2; /* hardcoded compat state */
 
 	fields->Set("current_state", currentState);
@@ -139,7 +122,7 @@ Dictionary::Ptr HostDbObject::GetStatusFields() const
 	fields->Set("normal_check_interval", host->GetCheckInterval() / 60.0);
 	fields->Set("retry_check_interval", host->GetRetryInterval() / 60.0);
 	fields->Set("check_timeperiod_object_id", host->GetCheckPeriod());
-	fields->Set("is_reachable", host->IsReachable());
+	fields->Set("is_reachable", host->GetLastReachable());
 	fields->Set("original_attributes", JsonEncode(host->GetOriginalAttributes()));
 
 	fields->Set("current_notification_number", CompatUtility::GetCheckableNotificationNotificationNumber(host));
@@ -275,8 +258,8 @@ void HostDbObject::OnConfigUpdateHeavy()
 			{ "dependent_host_object_id", host },
 			{ "inherits_parent", 1 },
 			{ "timeperiod_object_id", dep->GetPeriod() },
-			{ "fail_on_up", stateFilter & StateFilterUp },
-			{ "fail_on_down", stateFilter & StateFilterDown },
+			{ "fail_on_up", (stateFilter & StateFilterUp) ? 1 : 0 },
+			{ "fail_on_down", (stateFilter & StateFilterDown) ? 1 : 0 },
 			{ "instance_id", 0 } /* DbConnection class fills in real ID */
 		});
 		queries.emplace_back(std::move(query2));

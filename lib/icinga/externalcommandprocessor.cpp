@@ -1,21 +1,4 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #include "icinga/externalcommandprocessor.hpp"
 #include "icinga/host.hpp"
@@ -37,8 +20,6 @@
 #include "base/utility.hpp"
 #include "base/exception.hpp"
 #include <fstream>
-#include <boost/algorithm/string/classification.hpp>
-#include <boost/algorithm/string/split.hpp>
 #include <boost/thread/once.hpp>
 
 using namespace icinga;
@@ -66,8 +47,7 @@ void ExternalCommandProcessor::Execute(const String& line)
 	if (ts == 0)
 		BOOST_THROW_EXCEPTION(std::invalid_argument("Invalid timestamp in command: " + line));
 
-	std::vector<String> argv;
-	boost::algorithm::split(argv, args, boost::is_any_of(";"));
+	std::vector<String> argv = args.Split(";");
 
 	if (argv.empty())
 		BOOST_THROW_EXCEPTION(std::invalid_argument("Missing arguments in command: " + line));
@@ -277,8 +257,7 @@ void ExternalCommandProcessor::ExecuteFromFile(const String& line, std::deque< s
 	if (ts == 0)
 		BOOST_THROW_EXCEPTION(std::invalid_argument("Invalid timestamp in command: " + line));
 
-	std::vector<String> argv;
-	boost::algorithm::split(argv, args, boost::is_any_of(";"));
+	std::vector<String> argv = args.Split(";");
 
 	if (argv.empty())
 		BOOST_THROW_EXCEPTION(std::invalid_argument("Missing arguments in command: " + line));

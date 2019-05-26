@@ -1,21 +1,4 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #include "base/tlsutility.hpp"
 #include "base/convert.hpp"
@@ -24,6 +7,7 @@
 #include "base/utility.hpp"
 #include "base/application.hpp"
 #include "base/exception.hpp"
+#include <boost/asio/ssl/context.hpp>
 #include <fstream>
 
 namespace icinga
@@ -31,6 +15,7 @@ namespace icinga
 
 static bool l_SSLInitialized = false;
 static boost::mutex *l_Mutexes;
+static boost::mutex l_RandomMutex;
 
 #ifdef CRYPTO_LOCK
 static void OpenSSLLockingCallback(int mode, int type, const char *, int)
@@ -73,32 +58,9 @@ void InitializeOpenSSL()
 	l_SSLInitialized = true;
 }
 
-/**
- * Initializes an SSL context using the specified certificates.
- *
- * @param pubkey The public key.
- * @param privkey The matching private key.
- * @param cakey CA certificate chain file.
- * @returns An SSL context.
- */
-std::shared_ptr<SSL_CTX> MakeSSLContext(const String& pubkey, const String& privkey, const String& cakey)
+static void SetupSslContext(SSL_CTX *sslContext, const String& pubkey, const String& privkey, const String& cakey)
 {
-	char errbuf[120];
-
-	InitializeOpenSSL();
-
-	std::shared_ptr<SSL_CTX> sslContext = std::shared_ptr<SSL_CTX>(SSL_CTX_new(SSLv23_method()), SSL_CTX_free);
-
-	EC_KEY *ecdh = EC_KEY_new_by_curve_name(NID_secp384r1);
-
-	if (!ecdh)
-		Log(LogWarning, "SSL", "Failed to generate EC private key using EC_KEY_new_by_curve_name().");
-	else {
-		if (SSL_CTX_set_tmp_ecdh(sslContext.get(), ecdh) != 1)
-			Log(LogWarning, "SSL", "Failed to set ECDH parameters for SSL context using SSL_CTX_set_tmp_ecdh.");
-	}
-
-	EC_KEY_free(ecdh);
+	char errbuf[256];
 
 	long flags = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_CIPHER_SERVER_PREFERENCE;
 
@@ -106,13 +68,13 @@ std::shared_ptr<SSL_CTX> MakeSSLContext(const String& pubkey, const String& priv
 	flags |= SSL_OP_NO_COMPRESSION;
 #endif /* SSL_OP_NO_COMPRESSION */
 
-	SSL_CTX_set_options(sslContext.get(), flags);
+	SSL_CTX_set_options(sslContext, flags);
 
-	SSL_CTX_set_mode(sslContext.get(), SSL_MODE_ENABLE_PARTIAL_WRITE | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
-	SSL_CTX_set_session_id_context(sslContext.get(), (const unsigned char *)"Icinga 2", 8);
+	SSL_CTX_set_mode(sslContext, SSL_MODE_ENABLE_PARTIAL_WRITE | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
+	SSL_CTX_set_session_id_context(sslContext, (const unsigned char *)"Icinga 2", 8);
 
 	if (!pubkey.IsEmpty()) {
-		if (!SSL_CTX_use_certificate_chain_file(sslContext.get(), pubkey.CStr())) {
+		if (!SSL_CTX_use_certificate_chain_file(sslContext, pubkey.CStr())) {
 			Log(LogCritical, "SSL")
 				<< "Error with public key file '" << pubkey << "': " << ERR_peek_error() << ", \"" << ERR_error_string(ERR_peek_error(), errbuf) << "\"";
 			BOOST_THROW_EXCEPTION(openssl_error()
@@ -123,7 +85,7 @@ std::shared_ptr<SSL_CTX> MakeSSLContext(const String& pubkey, const String& priv
 	}
 
 	if (!privkey.IsEmpty()) {
-		if (!SSL_CTX_use_PrivateKey_file(sslContext.get(), privkey.CStr(), SSL_FILETYPE_PEM)) {
+		if (!SSL_CTX_use_PrivateKey_file(sslContext, privkey.CStr(), SSL_FILETYPE_PEM)) {
 			Log(LogCritical, "SSL")
 				<< "Error with private key file '" << privkey << "': " << ERR_peek_error() << ", \"" << ERR_error_string(ERR_peek_error(), errbuf) << "\"";
 			BOOST_THROW_EXCEPTION(openssl_error()
@@ -132,7 +94,7 @@ std::shared_ptr<SSL_CTX> MakeSSLContext(const String& pubkey, const String& priv
 				<< boost::errinfo_file_name(privkey));
 		}
 
-		if (!SSL_CTX_check_private_key(sslContext.get())) {
+		if (!SSL_CTX_check_private_key(sslContext)) {
 			Log(LogCritical, "SSL")
 				<< "Error checking private key '" << privkey << "': " << ERR_peek_error() << ", \"" << ERR_error_string(ERR_peek_error(), errbuf) << "\"";
 			BOOST_THROW_EXCEPTION(openssl_error()
@@ -142,7 +104,7 @@ std::shared_ptr<SSL_CTX> MakeSSLContext(const String& pubkey, const String& priv
 	}
 
 	if (!cakey.IsEmpty()) {
-		if (!SSL_CTX_load_verify_locations(sslContext.get(), cakey.CStr(), nullptr)) {
+		if (!SSL_CTX_load_verify_locations(sslContext, cakey.CStr(), nullptr)) {
 			Log(LogCritical, "SSL")
 				<< "Error loading and verifying locations in ca key file '" << cakey << "': " << ERR_peek_error() << ", \"" << ERR_error_string(ERR_peek_error(), errbuf) << "\"";
 			BOOST_THROW_EXCEPTION(openssl_error()
@@ -163,10 +125,48 @@ std::shared_ptr<SSL_CTX> MakeSSLContext(const String& pubkey, const String& priv
 				<< boost::errinfo_file_name(cakey));
 		}
 
-		SSL_CTX_set_client_CA_list(sslContext.get(), cert_names);
+		SSL_CTX_set_client_CA_list(sslContext, cert_names);
 	}
+}
+
+/**
+ * Initializes an SSL context using the specified certificates.
+ *
+ * @param pubkey The public key.
+ * @param privkey The matching private key.
+ * @param cakey CA certificate chain file.
+ * @returns An SSL context.
+ */
+std::shared_ptr<SSL_CTX> MakeSSLContext(const String& pubkey, const String& privkey, const String& cakey)
+{
+	InitializeOpenSSL();
+
+	std::shared_ptr<SSL_CTX> sslContext = std::shared_ptr<SSL_CTX>(SSL_CTX_new(SSLv23_method()), SSL_CTX_free);
+
+	SetupSslContext(sslContext.get(), pubkey, privkey, cakey);
 
 	return sslContext;
+}
+
+/**
+ * Initializes an SSL context using the specified certificates.
+ *
+ * @param pubkey The public key.
+ * @param privkey The matching private key.
+ * @param cakey CA certificate chain file.
+ * @returns An SSL context.
+ */
+std::shared_ptr<boost::asio::ssl::context> MakeAsioSslContext(const String& pubkey, const String& privkey, const String& cakey)
+{
+	namespace ssl = boost::asio::ssl;
+
+	InitializeOpenSSL();
+
+	auto context (std::make_shared<ssl::context>(ssl::context::sslv23));
+
+	SetupSslContext(context->native_handle(), pubkey, privkey, cakey);
+
+	return context;
 }
 
 /**
@@ -174,11 +174,11 @@ std::shared_ptr<SSL_CTX> MakeSSLContext(const String& pubkey, const String& priv
  * @param context The ssl context.
  * @param cipherList The ciper list.
  **/
-void SetCipherListToSSLContext(const std::shared_ptr<SSL_CTX>& context, const String& cipherList)
+void SetCipherListToSSLContext(const std::shared_ptr<boost::asio::ssl::context>& context, const String& cipherList)
 {
 	char errbuf[256];
 
-	if (SSL_CTX_set_cipher_list(context.get(), cipherList.CStr()) == 0) {
+	if (SSL_CTX_set_cipher_list(context->native_handle(), cipherList.CStr()) == 0) {
 		Log(LogCritical, "SSL")
 			<< "Cipher list '"
 			<< cipherList
@@ -198,9 +198,9 @@ void SetCipherListToSSLContext(const std::shared_ptr<SSL_CTX>& context, const St
  * @param context The ssl context.
  * @param tlsProtocolmin The minimum TLS protocol version.
  */
-void SetTlsProtocolminToSSLContext(const std::shared_ptr<SSL_CTX>& context, const String& tlsProtocolmin)
+void SetTlsProtocolminToSSLContext(const std::shared_ptr<boost::asio::ssl::context>& context, const String& tlsProtocolmin)
 {
-	long flags = SSL_CTX_get_options(context.get());
+	long flags = SSL_CTX_get_options(context->native_handle());
 
 	flags |= SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3;
 
@@ -217,7 +217,7 @@ void SetTlsProtocolminToSSLContext(const std::shared_ptr<SSL_CTX>& context, cons
 	if (tlsProtocolmin != SSL_TXT_TLSV1)
 		BOOST_THROW_EXCEPTION(std::invalid_argument("Invalid TLS protocol version specified."));
 
-	SSL_CTX_set_options(context.get(), flags);
+	SSL_CTX_set_options(context->native_handle(), flags);
 }
 
 /**
@@ -226,10 +226,10 @@ void SetTlsProtocolminToSSLContext(const std::shared_ptr<SSL_CTX>& context, cons
  * @param context The SSL context.
  * @param crlPath The path to the CRL file.
  */
-void AddCRLToSSLContext(const std::shared_ptr<SSL_CTX>& context, const String& crlPath)
+void AddCRLToSSLContext(const std::shared_ptr<boost::asio::ssl::context>& context, const String& crlPath)
 {
-	char errbuf[120];
-	X509_STORE *x509_store = SSL_CTX_get_cert_store(context.get());
+	char errbuf[256];
+	X509_STORE *x509_store = SSL_CTX_get_cert_store(context->native_handle());
 
 	X509_LOOKUP *lookup;
 	lookup = X509_STORE_add_lookup(x509_store, X509_LOOKUP_file());
@@ -259,7 +259,7 @@ void AddCRLToSSLContext(const std::shared_ptr<SSL_CTX>& context, const String& c
 
 static String GetX509NameCN(X509_NAME *name)
 {
-	char errbuf[120];
+	char errbuf[256];
 	char buffer[256];
 
 	int rc = X509_NAME_get_text_by_NID(name, NID_commonName, buffer, sizeof(buffer));
@@ -294,7 +294,7 @@ String GetCertificateCN(const std::shared_ptr<X509>& certificate)
  */
 std::shared_ptr<X509> GetX509Certificate(const String& pemfile)
 {
-	char errbuf[120];
+	char errbuf[256];
 	X509 *cert;
 	BIO *fpcert = BIO_new(BIO_s_file());
 
@@ -332,35 +332,32 @@ std::shared_ptr<X509> GetX509Certificate(const String& pemfile)
 
 int MakeX509CSR(const String& cn, const String& keyfile, const String& csrfile, const String& certfile, bool ca)
 {
-	char errbuf[120];
+	char errbuf[256];
 
 	InitializeOpenSSL();
 
-	EC_KEY *eckey = EC_KEY_new_by_curve_name(NID_secp384r1);
-	EC_KEY_set_asn1_flag(eckey, OPENSSL_EC_NAMED_CURVE);
+	RSA *rsa = RSA_new();
+	BIGNUM *e = BN_new();
 
-	if (!EC_KEY_generate_key(eckey)) {
-		EC_KEY_free(eckey);
-
+	if (!rsa || !e) {
 		Log(LogCritical, "SSL")
-			<< "Error while generating EC key pair: " << ERR_peek_error() << ", \"" << ERR_error_string(ERR_peek_error(), errbuf) << "\"";
+			<< "Error while creating RSA key: " << ERR_peek_error() << ", \"" << ERR_error_string(ERR_peek_error(), errbuf) << "\"";
 		BOOST_THROW_EXCEPTION(openssl_error()
-			<< boost::errinfo_api_function("EC_KEY_generate_key")
+			<< boost::errinfo_api_function("RSA_generate_key")
 			<< errinfo_openssl_error(ERR_peek_error()));
 	}
 
-	EVP_PKEY *key = EVP_PKEY_new();
+	BN_set_word(e, RSA_F4);
 
-	if (!EVP_PKEY_assign_EC_KEY(key, eckey)) {
-		EVP_PKEY_free(key);
-		EC_KEY_free(eckey);
-
+	if (!RSA_generate_key_ex(rsa, 4096, e, nullptr)) {
 		Log(LogCritical, "SSL")
-			<< "Error while assigning EC key to EVP_PKEY structure: " << ERR_peek_error() << ", \"" << ERR_error_string(ERR_peek_error(), errbuf) << "\"";
+			<< "Error while creating RSA key: " << ERR_peek_error() << ", \"" << ERR_error_string(ERR_peek_error(), errbuf) << "\"";
 		BOOST_THROW_EXCEPTION(openssl_error()
-			<< boost::errinfo_api_function("EC_KEY_generate_key")
+			<< boost::errinfo_api_function("RSA_generate_key")
 			<< errinfo_openssl_error(ERR_peek_error()));
 	}
+
+	BN_free(e);
 
 	Log(LogInformation, "base")
 		<< "Writing private key to '" << keyfile << "'.";
@@ -368,26 +365,19 @@ int MakeX509CSR(const String& cn, const String& keyfile, const String& csrfile, 
 	BIO *bio = BIO_new_file(const_cast<char *>(keyfile.CStr()), "w");
 
 	if (!bio) {
-		EVP_PKEY_free(key);
-		EC_KEY_free(eckey);
-
 		Log(LogCritical, "SSL")
-			<< "Error while opening private key file '" << keyfile << "': " << ERR_peek_error() << ", \"" << ERR_error_string(ERR_peek_error(), errbuf) << "\"";
+			<< "Error while opening private RSA key file '" << keyfile << "': " << ERR_peek_error() << ", \"" << ERR_error_string(ERR_peek_error(), errbuf) << "\"";
 		BOOST_THROW_EXCEPTION(openssl_error()
 			<< boost::errinfo_api_function("BIO_new_file")
 			<< errinfo_openssl_error(ERR_peek_error())
 			<< boost::errinfo_file_name(keyfile));
 	}
 
-	if (!PEM_write_bio_PrivateKey(bio, key, nullptr, nullptr, 0, nullptr, nullptr)) {
-		EVP_PKEY_free(key);
-		EC_KEY_free(eckey);
-		BIO_free(bio);
-
+	if (!PEM_write_bio_RSAPrivateKey(bio, rsa, nullptr, nullptr, 0, nullptr, nullptr)) {
 		Log(LogCritical, "SSL")
-			<< "Error while writing private key to file '" << keyfile << "': " << ERR_peek_error() << ", \"" << ERR_error_string(ERR_peek_error(), errbuf) << "\"";
+			<< "Error while writing private RSA key to file '" << keyfile << "': " << ERR_peek_error() << ", \"" << ERR_error_string(ERR_peek_error(), errbuf) << "\"";
 		BOOST_THROW_EXCEPTION(openssl_error()
-			<< boost::errinfo_api_function("PEM_write_bio_PrivateKey")
+			<< boost::errinfo_api_function("PEM_write_bio_RSAPrivateKey")
 			<< errinfo_openssl_error(ERR_peek_error())
 			<< boost::errinfo_file_name(keyfile));
 	}
@@ -397,6 +387,9 @@ int MakeX509CSR(const String& cn, const String& keyfile, const String& csrfile, 
 #ifndef _WIN32
 	chmod(keyfile.CStr(), 0600);
 #endif /* _WIN32 */
+
+	EVP_PKEY *key = EVP_PKEY_new();
+	EVP_PKEY_assign_RSA(key, rsa);
 
 	if (!certfile.IsEmpty()) {
 		X509_NAME *subject = X509_NAME_new();
@@ -573,7 +566,7 @@ std::shared_ptr<X509> CreateCert(EVP_PKEY *pubkey, X509_NAME *subject, X509_NAME
 
 String GetIcingaCADir()
 {
-	return Application::GetLocalStateDir() + "/lib/icinga2/ca";
+	return Configuration::DataDir + "/ca";
 }
 
 std::shared_ptr<X509> CreateCertIcingaCA(EVP_PKEY *pubkey, X509_NAME *subject)
@@ -584,6 +577,8 @@ std::shared_ptr<X509> CreateCertIcingaCA(EVP_PKEY *pubkey, X509_NAME *subject)
 
 	String cakeyfile = cadir + "/ca.key";
 
+	RSA *rsa;
+
 	BIO *cakeybio = BIO_new_file(const_cast<char *>(cakeyfile.CStr()), "r");
 
 	if (!cakeybio) {
@@ -592,11 +587,11 @@ std::shared_ptr<X509> CreateCertIcingaCA(EVP_PKEY *pubkey, X509_NAME *subject)
 		return std::shared_ptr<X509>();
 	}
 
-	EVP_PKEY *privkey = PEM_read_bio_PrivateKey(cakeybio, nullptr, nullptr, nullptr);
+	rsa = PEM_read_bio_RSAPrivateKey(cakeybio, nullptr, nullptr, nullptr);
 
-	if (!privkey) {
+	if (!rsa) {
 		Log(LogCritical, "SSL")
-			<< "Could not read private key from CA key file '" << cakeyfile << "': " << ERR_peek_error() << ", \"" << ERR_error_string(ERR_peek_error(), errbuf) << "\"";
+			<< "Could not read RSA key from CA key file '" << cakeyfile << "': " << ERR_peek_error() << ", \"" << ERR_error_string(ERR_peek_error(), errbuf) << "\"";
 		return std::shared_ptr<X509>();
 	}
 
@@ -605,6 +600,9 @@ std::shared_ptr<X509> CreateCertIcingaCA(EVP_PKEY *pubkey, X509_NAME *subject)
 	String cacertfile = cadir + "/ca.crt";
 
 	std::shared_ptr<X509> cacert = GetX509Certificate(cacertfile);
+
+	EVP_PKEY *privkey = EVP_PKEY_new();
+	EVP_PKEY_assign_RSA(privkey, rsa);
 
 	return CreateCert(pubkey, subject, X509_get_subject_name(cacert.get()), privkey, false);
 }
@@ -653,6 +651,19 @@ String PBKDF2_SHA1(const String& password, const String& salt, int iterations)
 
 	char output[SHA_DIGEST_LENGTH*2+1];
 	for (int i = 0; i < SHA_DIGEST_LENGTH; i++)
+		sprintf(output + 2 * i, "%02x", digest[i]);
+
+	return output;
+}
+
+String PBKDF2_SHA256(const String& password, const String& salt, int iterations)
+{
+	unsigned char digest[SHA256_DIGEST_LENGTH];
+	PKCS5_PBKDF2_HMAC(password.CStr(), password.GetLength(), reinterpret_cast<const unsigned char *>(salt.CStr()),
+		salt.GetLength(), iterations, EVP_sha256(), SHA256_DIGEST_LENGTH, digest);
+
+	char output[SHA256_DIGEST_LENGTH*2+1];
+	for (int i = 0; i < SHA256_DIGEST_LENGTH; i++)
 		sprintf(output + 2 * i, "%02x", digest[i]);
 
 	return output;
@@ -739,6 +750,11 @@ String RandomString(int length)
 {
 	auto *bytes = new unsigned char[length];
 
+	/* Ensure that password generation is atomic. RAND_bytes is not thread-safe
+	 * in OpenSSL < 1.1.0.
+	 */
+	boost::mutex::scoped_lock lock(l_RandomMutex);
+
 	if (!RAND_bytes(bytes, length)) {
 		delete [] bytes;
 
@@ -750,6 +766,8 @@ String RandomString(int length)
 			<< boost::errinfo_api_function("RAND_bytes")
 			<< errinfo_openssl_error(ERR_peek_error()));
 	}
+
+	lock.unlock();
 
 	auto *output = new char[length * 2 + 1];
 	for (int i = 0; i < length; i++)

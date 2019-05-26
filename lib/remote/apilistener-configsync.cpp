@@ -1,21 +1,4 @@
-/******************************************************************************
- * Icinga 2                                                                   *
- * Copyright (C) 2012-2018 Icinga Development Team (https://www.icinga.com/)  *
- *                                                                            *
- * This program is free software; you can redistribute it and/or              *
- * modify it under the terms of the GNU General Public License                *
- * as published by the Free Software Foundation; either version 2             *
- * of the License, or (at your option) any later version.                     *
- *                                                                            *
- * This program is distributed in the hope that it will be useful,            *
- * but WITHOUT ANY WARRANTY; without even the implied warranty of             *
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              *
- * GNU General Public License for more details.                               *
- *                                                                            *
- * You should have received a copy of the GNU General Public License          *
- * along with this program; if not, write to the Free Software Foundation     *
- * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.             *
- ******************************************************************************/
+/* Icinga 2 | (c) 2012 Icinga GmbH | GPLv2+ */
 
 #include "remote/apilistener.hpp"
 #include "remote/apifunction.hpp"
@@ -25,8 +8,6 @@
 #include "base/json.hpp"
 #include "base/convert.hpp"
 #include "config/vmops.hpp"
-#include <boost/algorithm/string/split.hpp>
-#include <boost/algorithm/string/classification.hpp>
 #include <fstream>
 
 using namespace icinga;
@@ -118,15 +99,14 @@ Value ApiListener::ConfigUpdateObjectAPIHandler(const MessageOrigin::Ptr& origin
 		/* object does not exist, create it through the API */
 		Array::Ptr errors = new Array();
 
-		if (!ConfigObjectUtility::CreateObject(ptype,
-			objName, config, errors)) {
+		if (!ConfigObjectUtility::CreateObject(ptype, objName, config, errors, nullptr)) {
 			Log(LogCritical, "ApiListener")
 				<< "Could not create object '" << objName << "':";
 
-				ObjectLock olock(errors);
+			ObjectLock olock(errors);
 			for (const String& error : errors) {
-					Log(LogCritical, "ApiListener", error);
-				}
+				Log(LogCritical, "ApiListener", error);
+			}
 
 			return Empty;
 		}
@@ -202,7 +182,7 @@ Value ApiListener::ConfigUpdateObjectAPIHandler(const MessageOrigin::Ptr& origin
 Value ApiListener::ConfigDeleteObjectAPIHandler(const MessageOrigin::Ptr& origin, const Dictionary::Ptr& params)
 {
 	Log(LogNotice, "ApiListener")
-		<< "Received update for object: " << JsonEncode(params);
+		<< "Received delete for object: " << JsonEncode(params);
 
 	/* check permissions */
 	ApiListener::Ptr listener = ApiListener::GetInstance();
@@ -212,7 +192,7 @@ Value ApiListener::ConfigDeleteObjectAPIHandler(const MessageOrigin::Ptr& origin
 
 	if (!listener->GetAcceptConfig()) {
 		Log(LogWarning, "ApiListener")
-			<< "Ignoring config update. '" << listener->GetName() << "' does not accept config.";
+			<< "Ignoring config delete. '" << listener->GetName() << "' does not accept config.";
 		return Empty;
 	}
 
@@ -220,14 +200,14 @@ Value ApiListener::ConfigDeleteObjectAPIHandler(const MessageOrigin::Ptr& origin
 
 	if (!endpoint) {
 		Log(LogNotice, "ApiListener")
-			<< "Discarding 'config update object' message from '" << origin->FromClient->GetIdentity() << "': Invalid endpoint origin (client not allowed).";
+			<< "Discarding 'config delete object' message from '" << origin->FromClient->GetIdentity() << "': Invalid endpoint origin (client not allowed).";
 		return Empty;
 	}
 
 	/* discard messages if the sender is in a child zone */
 	if (!Zone::GetLocalZone()->IsChildOf(endpoint->GetZone())) {
-		Log(LogWarning, "ApiListener")
-			<< "Discarding 'config update object' message from '"
+		Log(LogNotice, "ApiListener")
+			<< "Discarding 'config delete object' message from '"
 			<< origin->FromClient->GetIdentity() << "'.";
 		return Empty;
 	}
@@ -258,7 +238,7 @@ Value ApiListener::ConfigDeleteObjectAPIHandler(const MessageOrigin::Ptr& origin
 
 	Array::Ptr errors = new Array();
 
-	if (!ConfigObjectUtility::DeleteObject(object, true, errors)) {
+	if (!ConfigObjectUtility::DeleteObject(object, true, errors, nullptr)) {
 		Log(LogCritical, "ApiListener", "Could not delete object:");
 
 		ObjectLock olock(errors);
@@ -302,7 +282,15 @@ void ApiListener::UpdateConfigObject(const ConfigObject::Ptr& object, const Mess
 	params->Set("version", object->GetVersion());
 
 	if (object->GetPackage() == "_api") {
-		String file = ConfigObjectUtility::GetObjectConfigPath(object->GetReflectionType(), object->GetName());
+		String file;
+
+		try {
+			file = ConfigObjectUtility::GetObjectConfigPath(object->GetReflectionType(), object->GetName());
+		} catch (const std::exception& ex) {
+			Log(LogNotice, "ApiListener")
+				<< "Cannot sync object '" << object->GetName() << "': " << ex.what();
+			return;
+		}
 
 		std::ifstream fp(file.CStr(), std::ifstream::binary);
 		if (!fp)
@@ -319,8 +307,7 @@ void ApiListener::UpdateConfigObject(const ConfigObject::Ptr& object, const Mess
 	if (original_attributes) {
 		ObjectLock olock(original_attributes);
 		for (const Dictionary::Pair& kv : original_attributes) {
-			std::vector<String> tokens;
-			boost::algorithm::split(tokens, kv.first, boost::is_any_of("."));
+			std::vector<String> tokens = kv.first.Split(".");
 
 			Value value = object;
 			for (const String& token : tokens) {
@@ -344,7 +331,7 @@ void ApiListener::UpdateConfigObject(const ConfigObject::Ptr& object, const Mess
 #endif /* I2_DEBUG */
 
 	if (client)
-		JsonRpc::SendMessage(client->GetStream(), message);
+		client->SendMessage(message);
 	else {
 		Zone::Ptr target = static_pointer_cast<Zone>(object->GetZone());
 
@@ -394,7 +381,7 @@ void ApiListener::DeleteConfigObject(const ConfigObject::Ptr& object, const Mess
 #endif /* I2_DEBUG */
 
 	if (client)
-		JsonRpc::SendMessage(client->GetStream(), message);
+		client->SendMessage(message);
 	else {
 		Zone::Ptr target = static_pointer_cast<Zone>(object->GetZone());
 
